@@ -50,9 +50,9 @@ def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, 
 
     return DataTuple(dataset=dset, loader=data_loader, evaluator=evaluator)
 
-train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train,nominival', True, 128,True,False)
+train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train,nominival', False, 256,True,True)
  #'train,nominival'
-valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',True,128,True,False)
+valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',False,256,True,True)
 
 class Args():
     def __init__(self,l_layers,x_layers,r_layers):
@@ -62,8 +62,12 @@ class Args():
         self.from_scratch=False
 args = Args(9,5,5)
 
-from tasks.vqa_model import VQAModel
-model = VQAModel(train_tuple[0].num_answers,args)
+#from tasks.vqa_model import VQAModel
+from models.lxrt_adaptive import VQAModel_Adaptive
+
+adapt_span_params = {'adapt_span_enabled': True, 'attn_span': 32, 'adapt_span_loss': 0, 'adapt_span_ramp': 32, 'adapt_span_init': 0, 'adapt_span_cache': False, 'nb_heads': 12,'bs':512}
+
+model = VQAModel_Adaptive(train_tuple[0].num_answers,args,adapt_span_params)
 
 from pretrain.qa_answer_table import load_lxmert_qa
 
@@ -96,6 +100,12 @@ class Learner():
                 assert logit.dim() == target.dim() == 2
                 loss = self.criterion(logit,target)*logit.size(1)
                 
+                adapt_span_loss = 0.
+                for l in self.model.lxrt_encoder.model.bert.encoder.layer:
+                    adapt_span_loss += l.attention.self.adaptive_span.get_loss()
+                
+                loss += adapt_span_loss
+                
                 loss.backward()
                 nn.utils.clip_grad_norm_(self.model.parameters(), 5.)
                 self.optim.step()
@@ -104,8 +114,13 @@ class Learner():
                 for qid, l in zip(ques_id, label.cpu().numpy()):
                     ans = dset.label2ans[l]
                     quesid2ans[qid.item()] = ans
+                    
+                for l in self.model.lxrt_encoder.model.bert.encoder.layer:
+                    l.attention.self.adaptive_span.clamp_param()
+                    
             log_str = "\nEpoch %d: Train %0.2f\n" % (epoch, evaluator.evaluate(quesid2ans) * 100.)
-
+            print('Loss: ', loss)
+            print('Adapt_span_loss', adapt_span_loss)
             if self.valid_tuple is not None:  # Do Validation
                 valid_score = self.evaluate(self.valid_tuple)
                 if valid_score > best_valid:
@@ -173,6 +188,6 @@ class Learner():
         
 learn = Learner(model,train_tuple,valid_tuple)
 
-learn.train(4)
+learn.train(2)
 
 

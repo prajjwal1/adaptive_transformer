@@ -1,6 +1,7 @@
 import pickle
 import os
 import collections
+import argparse
 
 import numpy as np
 import torch
@@ -36,6 +37,23 @@ SPLIT2NAME = {
 }
 torch.cuda.is_available()
 
+parser = argparse.ArgumentParser()
+parser.add_argument(
+        "--bs",
+        default=None,
+        type=int,
+        required=True,
+        help="batch size",
+    )
+parser.add_argument(
+        "--tiny",
+        default=False,
+        type=bool,
+        required=False,
+        help="run on a sample data",
+    )
+args = parser.parse_args()
+
 DataTuple = collections.namedtuple("DataTuple", 'dataset loader evaluator')
 
 def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, shuffle=False, drop_last=False) -> DataTuple:
@@ -44,30 +62,30 @@ def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, 
     evaluator = VQAEvaluator(dset)
     data_loader = DataLoader(
         tset, batch_size=bs,
-        shuffle=shuffle, num_workers=8,
+        shuffle=shuffle, num_workers=16,
         drop_last=drop_last, pin_memory=True
     )
 
     return DataTuple(dataset=dset, loader=data_loader, evaluator=evaluator)
 
-train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train,nominival', False, 256,True,True)
+train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train,nominival', args.tiny, args.bs,True,True)
  #'train,nominival'
-valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',False,256,True,True)
+valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',args.tiny,args.bs,True,True)
 
-class Args():
+class Model_Args():
     def __init__(self,l_layers,x_layers,r_layers):
         self.llayers = l_layers
         self.xlayers = x_layers
         self.rlayers = r_layers
         self.from_scratch=False
-args = Args(9,5,5)
+model_args = Model_Args(6,4,4)
 
 #from tasks.vqa_model import VQAModel
 from models.lxrt_adaptive import VQAModel_Adaptive
 
-adapt_span_params = {'adapt_span_enabled': True, 'attn_span': 32, 'adapt_span_loss': 0, 'adapt_span_ramp': 32, 'adapt_span_init': 0, 'adapt_span_cache': False, 'nb_heads': 12,'bs':512}
+adapt_span_params = {'adapt_span_enabled': True, 'attn_span': 32, 'adapt_span_loss': 0, 'adapt_span_ramp': 32, 'adapt_span_init': 0, 'adapt_span_cache': False, 'nb_heads': 12,'bs': args.bs}
 
-model = VQAModel_Adaptive(train_tuple[0].num_answers,args,adapt_span_params)
+model = VQAModel_Adaptive(train_tuple[0].num_answers,model_args,adapt_span_params)
 
 from pretrain.qa_answer_table import load_lxmert_qa
 

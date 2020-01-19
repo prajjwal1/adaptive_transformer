@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
+from tqdm import tqdm
 
 tiny,fast = True,False
 
@@ -43,7 +44,7 @@ def load_obj_tsv(fname, topk=None):
     print("Start to load Faster-RCNN detected objects from %s" % fname)
     with open(fname) as f:
         reader = csv.DictReader(f, FIELDNAMES, delimiter="\t")
-        for i, item in enumerate(reader):
+        for i, item in tqdm(enumerate(reader)):
 
             for key in ['img_h', 'img_w', 'num_boxes']:
                 item[key] = int(item[key])

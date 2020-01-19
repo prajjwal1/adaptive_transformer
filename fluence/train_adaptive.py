@@ -99,7 +99,7 @@ class Learner():
         self.train_tuple = train_tuple
         self.valid_tuple = val_tuple
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-        self.output = home+'snap/'
+        self.output = home+'/snap/'
         os.makedirs(self.output, exist_ok=True)
         self.model.to(self.device)
         

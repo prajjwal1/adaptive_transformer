@@ -153,6 +153,9 @@ class BertAttention(nn.Module):
         
         return ctx_layer
     
+    def get_cache_size(self):
+        return self.adaptive_span.get_cache_size()
+    
 ## BertAttOutput
 
 class BertAttOutput(nn.Module):

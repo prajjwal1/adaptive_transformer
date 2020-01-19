@@ -2,6 +2,7 @@ import pickle
 import os
 import collections
 import argparse
+from pathlib import Path
 
 import numpy as np
 import torch
@@ -23,10 +24,11 @@ from transformers.modeling_bert import BertLayerNorm
 
 TINY_IMG_NUM = 512
 FAST_IMG_NUM = 5000
-
-MSCOCO_IMGFEAT_ROOT = '/home/u37216/data/mscoco_imgfeat/'
-VQA_DATA_ROOT = '/home/u37216/data/vqa/'
-load_lxmert_qa_path = '/home/u37216/snap/pretrained/model'
+home = str(Path.home())
+print(home)
+MSCOCO_IMGFEAT_ROOT = home + '/data/mscoco_imgfeat/'
+VQA_DATA_ROOT = home+'/data/vqa/'
+load_lxmert_qa_path = home+'/snap/pretrained/model'
 
 SPLIT2NAME = {
     'train': 'train2014',
@@ -170,7 +172,7 @@ class Learner():
         for i, datum_tuple in enumerate(loader):
             ques_id, feats, boxes, sent = datum_tuple[:4]   # Avoid seeing ground truth
             with torch.no_grad():
-                # feats, boxes = feats.cuda(), boxes.cuda()
+                feats, boxes = feats.to(self.device), boxes.to(self.device)
                 logit = self.model(feats, boxes, sent)
                 score, label = logit.max(1)
                 for qid, l in zip(ques_id, label.cpu().numpy()):

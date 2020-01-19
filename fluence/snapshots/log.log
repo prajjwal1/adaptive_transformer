@@ -2,3 +2,11 @@
 Epoch 0: Train 23.46
 Epoch 0: Valid 24.41
 Epoch 0: Best 24.41
+
+Epoch 0: Train 22.06
+Epoch 0: Valid 24.56
+Epoch 0: Best 24.56
+
+Epoch 1: Train 23.41
+Epoch 1: Valid 24.89
+Epoch 1: Best 24.89

@@ -40,7 +40,8 @@ class VQAModel(nn.Module):
             nn.Linear(hid_dim * 2, num_answers)
         )
         self.logit_fc.apply(self.lxrt_encoder.model.init_bert_weights)
-
+        print("Using non adaptive variant")
+        
     def forward(self, feat, pos, sent):
         """
         b -- batch_size, o -- object_number, f -- visual_feature_size

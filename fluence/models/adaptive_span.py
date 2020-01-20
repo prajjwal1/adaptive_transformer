@@ -1,4 +1,4 @@
-# The following code has been adapted from FAIR's "Adaptive Attention Span in Transformers " (ACL 2019) work with minor modifications
+# The following code has been adapted from FAIR's "Adaptive Attention Span in Transformers " (ACL 2019) work with modifications
 
 import math
 
@@ -42,20 +42,19 @@ class AdaptiveMask(nn.Module):
 
     def __init__(self, max_size, ramp_size, init_val=0, shape=(1,)):
         nn.Module.__init__(self)
-        self._max_size = max_size                                       # 32
+        self._max_size = max_size    # [attn_span]
         self._ramp_size = ramp_size
-        self.current_val = nn.Parameter(torch.zeros(*shape) + init_val) # [12,1,1]
-        mask_template = torch.linspace(1 - max_size, 0, steps=max_size) # 32
+        self.current_val = nn.Parameter(torch.zeros(*shape) + init_val) # [bs,nb_heads,1,1]
+        mask_template = torch.linspace(1 - max_size, 0, steps=max_size) # [attn_span]
         self.register_buffer('mask_template', mask_template)
 
     def forward(self, x):
-        mask = self.mask_template + self.current_val * self._max_size # [12,1,32]
-        mask = mask / self._ramp_size + 1                             # [12,1,32]
+        mask = self.mask_template + self.current_val * self._max_size
+        mask = mask / self._ramp_size + 1                             
         mask = mask.clamp(0, 1)
         if x.size(-1) < self._max_size:
             # the input could have been trimmed beforehand to save computation
             mask = mask[:, :, -x.size(-1):]
-        #print(x.shape, mask.shape)
         x = x * mask # [128, 12, 20, 32], [12, 1, 32]
         #print(x.shape)
         return x

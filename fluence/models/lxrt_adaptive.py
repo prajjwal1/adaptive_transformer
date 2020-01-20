@@ -11,9 +11,7 @@ from lxrt.modeling import VISUAL_CONFIG
 from .adaptive_span import _skew,_unskew, AdaptiveSpan
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-
-adapt_span_params = {'adapt_span_enabled': True, 'attn_span': 32, 'adapt_span_loss': 0, 'adapt_span_ramp': 32, 'adapt_span_init': 0,
-                     'adapt_span_cache': False, 'nb_heads': 12}
+MAX_VQA_LENGTH = 20
 bert_config = BertConfig()
 
 class GeLU(nn.Module):
@@ -22,15 +20,13 @@ class GeLU(nn.Module):
     def forward(self,x):
         return F.gelu(x)
 
-class Args():
+class Model_Args():
     def __init__(self,l_layers,x_layers,r_layers):
         self.llayers = l_layers
         self.xlayers = x_layers
         self.rlayers = r_layers
         self.from_scratch=False
-args = Args(9,5,5)
-MAX_VQA_LENGTH = 32
-
+        
 ## BertEmbeddings
 class BertEmbeddings(nn.Module):
     """Construct the embeddings from word, position and token_type embeddings.
@@ -89,7 +85,7 @@ class BertAttention(nn.Module):
         self.query = nn.Linear(config.hidden_size, self.all_head_size) # 768x768
         self.key = nn.Linear(ctx_dim, self.all_head_size) # 768x768
         self.value = nn.Linear(ctx_dim, self.all_head_size) # 768x768
-        
+        self.att_mask_proj = nn.Linear(MAX_VQA_LENGTH, adapt_span_params['attn_span'])
         attn_span = adapt_span_params['attn_span']
         
         self.k_pe = nn.Parameter(
@@ -114,9 +110,7 @@ class BertAttention(nn.Module):
         v = self.key(context)                                               #[bs, 20, 768]
 
         
-        if self.adapt_span_enabled:
-            k, v, k_pe = self.adaptive_span.trim_memory(q,k,v,self.k_pe) #[bs, 68, 768],[bs, 68, 768],[1, 64, 32]
-
+        k, v, k_pe = self.adaptive_span.trim_memory(q,k,v,self.k_pe) #[bs, 68, 768],[bs, 68, 768],[1, 64, 32]
 
         q = self.transpose_for_scores(q)                                # [bs, 12, 36, 64]
         k = self.transpose_for_scores(k)                                # [bs, 12, 68, 64]
@@ -134,7 +128,8 @@ class BertAttention(nn.Module):
         attention_scores = attention_cont+attention_pos                 #[128, 12, 36, 32]
         attention_scores = attention_scores/math.sqrt(self.attention_head_size)
         
-        if attention_mask is not None:
+        if attention_mask is not None:                                  # mask: [bs,1,1,MAX_VQA_LENGTH]
+            attention_mask = self.att_mask_proj(attention_mask)         # mask: [bs,1,1,attn_span]
             attention_scores = attention_scores + attention_mask
             
         
@@ -155,8 +150,6 @@ class BertAttention(nn.Module):
     
     def get_cache_size(self):
         return self.adaptive_span.get_cache_size()
-    
-## BertAttOutput
 
 class BertAttOutput(nn.Module):
     """
@@ -207,7 +200,7 @@ class BertSelfattLayer(nn.Module):
                              attention_mask = torch.rand(128,1,1,20))
     output.shape [128, 20, 768]
     """
-    def __init__(self, config, adapt_span_params=adapt_span_params):
+    def __init__(self, config, adapt_span_params):
         super(BertSelfattLayer, self).__init__()
         self.self = BertAttention(config, adapt_span_params=adapt_span_params)
         self.output = BertAttOutput(config)
@@ -265,7 +258,7 @@ class BertLayer(nn.Module):
     output = bert_layer(torch.rand(128,20,768),torch.rand(128,1,1,20))
     output.shape [128,20,768]
     """
-    def __init__(self, config, adapt_span_params=adapt_span_params):
+    def __init__(self, config, adapt_span_params):
         super(BertLayer, self).__init__()
         self.attention = BertSelfattLayer(config,adapt_span_params=adapt_span_params)
         self.intermediate = BertIntermediate(config)
@@ -411,20 +404,20 @@ class LXRTEncoder(nn.Module):
         self.layer = nn.ModuleList(
             [BertLayer(config,adapt_span_params=adapt_span_params) for _ in range(self.num_l_layers)]
         )
-        self.x_layers = nn.ModuleList(
-            [LXRTXLayer(config,adapt_span_params=adapt_span_params) for _ in range(self.num_x_layers)]
-        )
         self.r_layers = nn.ModuleList(
             [BertLayer(config,adapt_span_params=adapt_span_params) for _ in range(self.num_r_layers)]
         )
+        self.x_layers = nn.ModuleList(
+            [LXRTXLayer(config,adapt_span_params=adapt_span_params) for _ in range(self.num_x_layers)]
+        )
+        
 
     def forward(self, lang_feats, lang_attention_mask,
                 visn_feats, visn_attention_mask=None):
         # Run visual embedding layer
         # Note: Word embedding layer was executed outside this module.
         #       Keep this design to allow loading BERT weights.
-        visn_feats = self.visn_fc(visn_feats)
-        #print('visn_feats_from_visn_fc', visn_feats.shape) : [128, 36, 768]
+        visn_feats = self.visn_fc(visn_feats)   #  [bs, 36, 768]
 
         # Run language layers
         for layer_module in self.layer:
@@ -685,7 +678,8 @@ class VQAModel_Adaptive(nn.Module):
             nn.Linear(hid_dim * 2, num_answers)
         )
         self.logit_fc.apply(self.lxrt_encoder.model.init_bert_weights)
-
+        print("Using adaptive variant")
+        
     def forward(self, feat, pos, sent):
         """
         b -- batch_size, o -- object_number, f -- visual_feature_size

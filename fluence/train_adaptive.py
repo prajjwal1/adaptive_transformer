@@ -62,16 +62,16 @@ def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, 
     dset = VQADataset(path,splits)
     tset = VQATorchDataset(dset,mscoco_path,tiny)
     evaluator = VQAEvaluator(dset)
+    pin_memory = True if torch.cuda.is_available() else False
     data_loader = DataLoader(
         tset, batch_size=bs,
-        shuffle=shuffle, num_workers=16,
-        drop_last=drop_last, pin_memory=True
+        shuffle=shuffle, num_workers=1,
+        drop_last=drop_last, pin_memory=pin_memory
     )
 
     return DataTuple(dataset=dset, loader=data_loader, evaluator=evaluator)
 
 train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train,nominival', args.tiny, args.bs,True,True)
- #'train,nominival'
 valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',args.tiny,args.bs,True,True)
 
 class Model_Args():
@@ -117,6 +117,11 @@ class Learner():
                 self.optim.zero_grad()
                 feats, boxes, target = feats.to(self.device), boxes.to(self.device), target.to(self.device)
                 logit = self.model(feats,boxes,sent)
+                
+                for i in model.lxrt_encoder.model.bert.encoder.layer:
+                    l = i.attention.self.adaptive_span.get_current_avg_span()
+                    print('Adaptive Span', l, end="")
+                
                 assert logit.dim() == target.dim() == 2
                 loss = self.criterion(logit,target)*logit.size(1)
                 

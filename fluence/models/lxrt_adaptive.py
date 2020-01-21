@@ -11,7 +11,7 @@ from lxrt.modeling import VISUAL_CONFIG
 from .adaptive_span import _skew,_unskew, AdaptiveSpan
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-MAX_VQA_LENGTH = 20
+MAX_VQA_LENGTH = 64
 bert_config = BertConfig()
 
 class GeLU(nn.Module):
@@ -85,7 +85,7 @@ class BertAttention(nn.Module):
         self.query = nn.Linear(config.hidden_size, self.all_head_size) # 768x768
         self.key = nn.Linear(ctx_dim, self.all_head_size) # 768x768
         self.value = nn.Linear(ctx_dim, self.all_head_size) # 768x768
-        self.att_mask_proj = nn.Linear(MAX_VQA_LENGTH, adapt_span_params['attn_span'])
+        #self.att_mask_proj = nn.Linear(MAX_VQA_LENGTH, adapt_span_params['attn_span'])
         attn_span = adapt_span_params['attn_span']
         
         self.k_pe = nn.Parameter(
@@ -129,7 +129,7 @@ class BertAttention(nn.Module):
         attention_scores = attention_scores/math.sqrt(self.attention_head_size)
         
         if attention_mask is not None:                                  # mask: [bs,1,1,MAX_VQA_LENGTH]
-            attention_mask = self.att_mask_proj(attention_mask)         # mask: [bs,1,1,attn_span]
+            #attention_mask = self.att_mask_proj(attention_mask)         # mask: [bs,1,1,attn_span]
             attention_scores = attention_scores + attention_mask
             
         

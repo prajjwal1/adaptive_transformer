@@ -30,14 +30,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument(
         "--bs",
         default=None,
-        action='store_false',
+        type=int,
         required=True,
         help="batch size",
     )
 parser.add_argument(
         "--tiny",
         default=False,
-        action='store_false',
         required=False,
         help="run on a sample data",
     )
@@ -45,11 +44,9 @@ parser.add_argument(
         "--adaptive",
         default=False,
         required=True,
-        action='store_false',
         help="Use Adaptive Attention Span",
     )
 args = parser.parse_args()
-args.adaptive = False
 print(args)
 
 if args.adaptive:

@@ -75,6 +75,18 @@ class Learner():
                     for l in self.model.lxrt_encoder.model.bert.encoder.layer:
                         l.attention.self.adaptive_span.clamp_param()
                         
+                    for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
+                        l.visual_attention.att.adaptive_span.clamp_param()
+                    
+                    for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
+                        l.lang_self_att.self.adaptive_span.clamp_param()
+                        
+                    for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
+                        l.visn_self_att.self.adaptive_span.clamp_param()
+                     
+                    for l in self.model.lxrt_encoder.model.bert.encoder.r_layers:
+                        l.attention.self.adaptive_span.clamp_param()
+                        
             if self.adaptive:
                 for layer_idx, i in enumerate(self.model.lxrt_encoder.model.bert.encoder.layer):
                     l = i.attention.self.adaptive_span.get_current_avg_span()

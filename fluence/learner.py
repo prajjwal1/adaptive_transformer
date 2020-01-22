@@ -59,7 +59,6 @@ class Learner():
                         adapt_span_loss += l.attention.self.adaptive_span.get_loss()
          #####################################################       
                     loss += adapt_span_loss
-                    print('adapt_span_loss: ', adapt_span_loss.item())
                 
                 loss.backward()
                 
@@ -110,6 +109,7 @@ class Learner():
                         
             log_str = "\nEpoch %d: Train %0.2f\n" % (epoch, evaluator.evaluate(quesid2ans) * 100.)
             print('Loss: ', loss)
+            print('adapt_span_loss: ', adapt_span_loss.item())
             if self.valid_tuple is not None:  # Do Validation
                 valid_score = self.evaluate(self.valid_tuple)
                 if valid_score > best_valid:

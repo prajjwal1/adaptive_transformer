@@ -594,7 +594,8 @@ class LXRTEncoder_(nn.Module):
         self.model = VisualBertForLXRFeature.from_pretrained(
             "bert-base-uncased",
             adapt_span_params=adapt_span_params,
-            mode=mode
+            mode=mode,
+            args = args,
         )
 
         if args.from_scratch:

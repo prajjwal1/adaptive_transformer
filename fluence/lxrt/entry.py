@@ -91,8 +91,9 @@ class LXRTEncoder(nn.Module):
 
         # Build LXRT Model
         self.model = VisualBertForLXRFeature.from_pretrained(
-            "bert-base-uncased",
-            mode=mode
+            pretrained_model_name_or_path = "bert-base-uncased",
+            mode=mode,
+            args=args,
         )
 
         if args.from_scratch:

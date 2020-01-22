@@ -29,21 +29,24 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument(
         "--bs",
-        default=None,
+        default=128,
         type=int,
         required=True,
         help="batch size",
     )
 parser.add_argument(
         "--tiny",
-        default=False,
-        required=False,
+        action="store_true",
         help="run on a sample data",
     )
 parser.add_argument(
         "--adaptive",
-        default=False,
-        required=True,
+        action="store_true",
+        help="Use Adaptive Attention Span",
+    )
+parser.add_argument(
+        "--sparse",
+        action="store_true",
         help="Use Adaptive Attention Span",
     )
 args = parser.parse_args()
@@ -91,6 +94,7 @@ train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train,nominiva
 valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',args.tiny,args.bs,True,True)
         
 model_args = Model_Args(9,6,6)
+model_args.sparse = args.sparse
 
 adapt_span_params = {'adapt_span_enabled': True, 'attn_span': 1024, 'adapt_span_loss': 0.0000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs}
 

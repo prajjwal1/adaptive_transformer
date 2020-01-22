@@ -84,7 +84,7 @@ def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, 
     pin_memory = True if torch.cuda.is_available() else False
     data_loader = DataLoader(
         tset, batch_size=bs,
-        shuffle=shuffle, num_workers=1,
+        shuffle=shuffle, num_workers=0,
         drop_last=drop_last, pin_memory=pin_memory
     )
 
@@ -105,6 +105,6 @@ else:
     
 learn = Learner(model,train_tuple,valid_tuple,args.adaptive)
 
-learn.train(10)
+learn.train(2)
 
 

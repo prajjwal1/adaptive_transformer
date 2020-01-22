@@ -31,6 +31,7 @@ import torch
 from torch import nn
 from torch.nn import CrossEntropyLoss, SmoothL1Loss
 
+from entmax import entmax_bisect
 from .file_utils import cached_path
 
 logger = logging.getLogger(__name__)
@@ -312,6 +313,7 @@ class BertAttention(nn.Module):
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         self.sparse = config.sparse
+        self.alpha = nn.Parameter(torch.Tensor([1.5]))
 
     def transpose_for_scores(self, x):
         new_x_shape = x.size()[:-1] + (self.num_attention_heads, self.attention_head_size)
@@ -335,8 +337,10 @@ class BertAttention(nn.Module):
             attention_scores = attention_scores + attention_mask
 
         # Normalize the attention scores to probabilities.
-        attention_probs = nn.Softmax(dim=-1)(attention_scores)
-
+        if not self.sparse:
+            attention_probs = nn.Softmax(dim=-1)(attention_scores)
+        else:
+            attention_probs = entmax_bisect(attention_scores,self.alpha)
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)

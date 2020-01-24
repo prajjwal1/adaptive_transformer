@@ -41,8 +41,9 @@ class Learner():
                 loss = self.criterion(logit,target)*logit.size(1)
                 
          #####################################################       
-                adapt_span_loss = 0.
                 if self.adaptive:
+                    
+                    adapt_span_loss = 0.
                     for l in self.model.lxrt_encoder.model.bert.encoder.layer:
                         adapt_span_loss += l.attention.self.adaptive_span.get_loss()
                 
@@ -109,7 +110,8 @@ class Learner():
                         
             log_str = "\nEpoch %d: Train %0.2f\n" % (epoch, evaluator.evaluate(quesid2ans) * 100.)
             print('Loss: ', loss)
-            print('adapt_span_loss: ', adapt_span_loss)
+            if self.adaptive:
+                print('adapt_span_loss: ', adapt_span_loss)
             if self.valid_tuple is not None:  # Do Validation
                 valid_score = self.evaluate(self.valid_tuple)
                 if valid_score > best_valid:

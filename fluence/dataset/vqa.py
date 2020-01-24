@@ -16,8 +16,7 @@ from tqdm import tqdm
 
 tiny,fast = True,False
 
-TINY_IMG_NUM = 512
-FAST_IMG_NUM = 5000
+TINY_IMG_NUM = 500
 
 csv.field_size_limit(sys.maxsize)
 FIELDNAMES = ["img_id", "img_h", "img_w", "objects_id", "objects_conf",
@@ -128,8 +127,6 @@ class VQATorchDataset(Dataset):
 
         if tiny:
             topk = TINY_IMG_NUM
-        elif fast:
-            topk = FAST_IMG_NUM
         else:
             topk = None
 

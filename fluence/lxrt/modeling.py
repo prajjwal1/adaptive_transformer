@@ -292,7 +292,17 @@ class BertEmbeddings(nn.Module):
         embeddings = self.dropout(embeddings)
         return embeddings
 
+class AlphaChooser(torch.nn.Module):
 
+    def __init__(self, head_count):
+        """head_count (int): number of attention heads"""
+        super(AlphaChooser, self).__init__()
+        self.pre_alpha = nn.Parameter(torch.randn(head_count))
+
+    def forward(self):
+        alpha = 1 + torch.sigmoid(self.pre_alpha)
+        return torch.clamp(alpha, min=1.01, max=2)
+    
 class BertAttention(nn.Module):
     def __init__(self, config, ctx_dim=None):
         super().__init__()
@@ -341,6 +351,7 @@ class BertAttention(nn.Module):
             attention_probs = nn.Softmax(dim=-1)(attention_scores)
         else:
             attention_probs = entmax_bisect(attention_scores,self.alpha)
+            
         # This is actually dropping out entire tokens to attend to, which might
         # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)

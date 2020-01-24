@@ -11,7 +11,7 @@ from lxrt.modeling import VISUAL_CONFIG
 from .adaptive_span import _skew,_unskew, AdaptiveSpan
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
-MAX_VQA_LENGTH = 64
+MAX_VQA_LENGTH = 20
 bert_config = BertConfig()
 
 class GeLU(nn.Module):
@@ -85,15 +85,14 @@ class BertAttention(nn.Module):
         self.query = nn.Linear(config.hidden_size, self.all_head_size) # 768x768
         self.key = nn.Linear(ctx_dim, self.all_head_size) # 768x768
         self.value = nn.Linear(ctx_dim, self.all_head_size) # 768x768
-        #self.att_mask_proj = nn.Linear(MAX_VQA_LENGTH, adapt_span_params['attn_span'])
         attn_span = adapt_span_params['attn_span']
         
-        self.k_pe = nn.Parameter(
-            torch.randn(1, config.hidden_size // self.num_attention_heads, attn_span))
+        #self.k_pe = nn.Parameter(
+        #    torch.randn(1, config.hidden_size // self.num_attention_heads, attn_span))
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         
-        self.adapt_span_enabled = adapt_span_params['adapt_span_enabled']
+        #self.adapt_span_enabled = adapt_span_params['adapt_span_enabled']
         
         self.adaptive_span = AdaptiveSpan(**adapt_span_params)
         
@@ -104,49 +103,38 @@ class BertAttention(nn.Module):
         return x.permute(0, 2, 1, 3)
 
     def forward(self, hidden_states, context, attention_mask=None):
-        
-        q = self.query(hidden_states)                                       #[bs, 36, 768]
-        k = self.key(context)                                               #[bs, 20, 768]
-        v = self.key(context)                                               #[bs, 20, 768]
+        #print('Hidden States: ', hidden_states.shape)
+        #print('context: :', context.shape)
+        mixed_query_layer = self.query(hidden_states)
+        mixed_key_layer = self.key(context)
+        mixed_value_layer = self.value(context)
 
-        
-        k, v, k_pe = self.adaptive_span.trim_memory(q,k,v,self.k_pe) #[bs, 68, 768],[bs, 68, 768],[1, 64, 32]
+        query_layer = self.transpose_for_scores(mixed_query_layer)
+        key_layer = self.transpose_for_scores(mixed_key_layer)
+        value_layer = self.transpose_for_scores(mixed_value_layer)
 
-        q = self.transpose_for_scores(q)                                # [bs, 12, 36, 64]
-        k = self.transpose_for_scores(k)                                # [bs, 12, 68, 64]
-        v = self.transpose_for_scores(v)                                # [bs, 12, 68, 64]
-
-        attention_cont = torch.matmul(q, k.transpose(-1, -2))           # [bs, 12, 36, 68]
-        
-        d0,d1,d2,d3 = attention_cont.size()
-        attention_cont = torch.reshape(attention_cont, (d0*d1,d2,d3))   #[bs*d1, 36, 68]
-        attention_cont = _unskew(attention_cont)                        #[bs*d1, 36, 32]
-        attention_cont = torch.reshape(attention_cont, (d0,d1,d2,-1))
-    
-        attention_pos = torch.matmul(q, k_pe)                           #[128, 12, 36, 32]
-        
-        attention_scores = attention_cont+attention_pos                 #[128, 12, 36, 32]
-        attention_scores = attention_scores/math.sqrt(self.attention_head_size)
-        
-        if attention_mask is not None:                                  # mask: [bs,1,1,MAX_VQA_LENGTH]
-            #attention_mask = self.att_mask_proj(attention_mask)         # mask: [bs,1,1,attn_span]
+        # Take the dot product between "query" and "key" to get the raw attention scores.
+        attention_scores = torch.matmul(query_layer, key_layer.transpose(-1, -2))
+        attention_scores = attention_scores / math.sqrt(self.attention_head_size)
+        # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
+        if attention_mask is not None:
             attention_scores = attention_scores + attention_mask
-            
-        
-        attention_probs = nn.Softmax(dim=-1)(attention_scores)         
-        attention_probs = self.adaptive_span(attention_probs)               # [128, 12, 36, 32]
 
+        # Normalize the attention scores to probabilities.
+
+        attention_probs = nn.Softmax(dim=-1)(attention_scores)
+        #print(attention_probs.shape)
+        attention_probs = self.adaptive_span(attention_probs)
+
+        # This is actually dropping out entire tokens to attend to, which might
+        # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
-        attention_probs = torch.reshape(attention_probs, (d0*d1,d2,-1))#[bs*d1,36,32]
-        attention_probs = _skew(attention_probs,0)                     #[bs*d1,36,68]
-        attention_probs = torch.reshape(attention_probs,(d0,d1,d2,-1)) #[bs,d1,36,68]
-        
-        ctx_layer = torch.matmul(attention_probs, v)                   #[bs,12, 36, 64]
-        ctx_layer = ctx_layer.permute(0, 2, 1, 3).contiguous()         #[bs,36,12,64]
-        new_ctx_layer_shape = ctx_layer.size()[:-2] + (self.all_head_size,) #[bs,d1,768]
-        ctx_layer = ctx_layer.view(*new_ctx_layer_shape)
-        
-        return ctx_layer
+
+        context_layer = torch.matmul(attention_probs, value_layer)
+        context_layer = context_layer.permute(0, 2, 1, 3).contiguous()
+        new_context_layer_shape = context_layer.size()[:-2] + (self.all_head_size,)
+        context_layer = context_layer.view(*new_context_layer_shape)
+        return context_layer
     
     def get_cache_size(self):
         return self.adaptive_span.get_cache_size()

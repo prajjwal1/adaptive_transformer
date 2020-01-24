@@ -57,8 +57,6 @@ if args.adaptive:
 else:
     from tasks.vqa_model import VQAModel
     
-TINY_IMG_NUM = 512
-FAST_IMG_NUM = 5000
 
 home = str(Path.home())
 MSCOCO_IMGFEAT_ROOT = home + '/data/mscoco_imgfeat/'
@@ -84,7 +82,7 @@ def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, 
     pin_memory = True if torch.cuda.is_available() else False
     data_loader = DataLoader(
         tset, batch_size=bs,
-        shuffle=shuffle, num_workers=0,
+        shuffle=shuffle, num_workers=1,
         drop_last=drop_last, pin_memory=pin_memory
     )
 
@@ -96,15 +94,16 @@ valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',args.t
 model_args = Model_Args(9,6,6)
 model_args.sparse = args.sparse
 
-adapt_span_params = {'adapt_span_enabled': True, 'attn_span': 1024, 'adapt_span_loss': 0.0000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs}
-
 if args.adaptive:
+    
+    adapt_span_params = {'adapt_span_enabled': True, 'attn_span': 1024, 'adapt_span_loss_coeff': 0.000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0.6, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs, 'mask_size': [20,36]}
+    
     model = VQAModel_Adaptive(train_tuple[0].num_answers,model_args,adapt_span_params)
 else:
     model = VQAModel(train_tuple[0].num_answers,model_args)
     
 learn = Learner(model,train_tuple,valid_tuple,args.adaptive)
 
-learn.train(2)
+learn.train(5)
 
 

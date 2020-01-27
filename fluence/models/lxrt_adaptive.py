@@ -5,10 +5,9 @@ import torch.nn.functional as F
 from transformers.modeling_bert import BertLayerNorm
 from transformers import BertConfig
 from transformers import BertTokenizer
-from lxrt.modeling import BertPreTrainedModel
-from lxrt.entry import InputFeatures,convert_sents_to_features,set_visual_config
-from lxrt.modeling import VISUAL_CONFIG
-from .adaptive_span import _skew,_unskew, AdaptiveSpan
+from .lxmert_utils import BertPreTrainedModel, VISUAL_CONFIG, set_visual_config, InputFeatures, convert_sents_to_features
+from entmax import entmax_bisect
+from .adaptive_span import AdaptiveSpan
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 MAX_VQA_LENGTH = 20
@@ -19,13 +18,6 @@ class GeLU(nn.Module):
         super().__init__()
     def forward(self,x):
         return F.gelu(x)
-
-class Model_Args():
-    def __init__(self,l_layers,x_layers,r_layers):
-        self.llayers = l_layers
-        self.xlayers = x_layers
-        self.rlayers = r_layers
-        self.from_scratch=False
         
 ## BertEmbeddings
 class BertEmbeddings(nn.Module):
@@ -58,6 +50,17 @@ class BertEmbeddings(nn.Module):
     
 ## BertAttention
 
+class AlphaChooser(torch.nn.Module):
+
+    def __init__(self, head_count):
+        """head_count (int): number of attention heads"""
+        super(AlphaChooser, self).__init__()
+        self.pre_alpha = nn.Parameter(torch.randn(head_count))
+
+    def forward(self):
+        alpha = 1 + torch.sigmoid(self.pre_alpha)
+        return torch.clamp(alpha, min=1.01, max=2)
+    
 class BertAttention(nn.Module):
     """
     from transformers import BertConfig
@@ -69,32 +72,30 @@ class BertAttention(nn.Module):
     context_output.shape # [128, 20, 768]
 
     """
-    def __init__(self, config, ctx_dim=None, adapt_span_params=None):
+    def __init__(self, config, params):
         super().__init__()
         if config.hidden_size % config.num_attention_heads != 0:
             raise ValueError(
                 "The hidden size (%d) is not a multiple of the number of attention "
                 "heads (%d)" % (config.hidden_size, config.num_attention_heads))
-        self.num_attention_heads = config.num_attention_heads # 12
+            
+        self.num_attention_heads = config.num_attention_heads #params['num_attention_heads'] # 12
         self.attention_head_size = config.hidden_size // config.num_attention_heads # 768/12
         self.all_head_size = self.num_attention_heads * self.attention_head_size # 12*64
 
-        # visual_dim = 2048
-        if ctx_dim is None:
-            ctx_dim =config.hidden_size
         self.query = nn.Linear(config.hidden_size, self.all_head_size) # 768x768
-        self.key = nn.Linear(ctx_dim, self.all_head_size) # 768x768
-        self.value = nn.Linear(ctx_dim, self.all_head_size) # 768x768
-        attn_span = adapt_span_params['attn_span']
-        
-        #self.k_pe = nn.Parameter(
-        #    torch.randn(1, config.hidden_size // self.num_attention_heads, attn_span))
+        self.key = nn.Linear(config.hidden_size, self.all_head_size) # 768x768
+        self.value = nn.Linear(config.hidden_size, self.all_head_size) # 768x768
 
         self.dropout = nn.Dropout(config.attention_probs_dropout_prob)
         
-        #self.adapt_span_enabled = adapt_span_params['adapt_span_enabled']
-        
-        self.adaptive_span = AdaptiveSpan(**adapt_span_params)
+        self.adapt_span_bool = params['adapt_span_enabled']
+        self.sparse = params['sparse_enabled']
+        if self.sparse:
+            alpha = AlphaChooser(1)
+            self.alpha =  nn.Parameter(alpha())
+        if self.adapt_span_bool:
+            self.adaptive_span = AdaptiveSpan(**params)
         
 
     def transpose_for_scores(self, x):
@@ -120,14 +121,14 @@ class BertAttention(nn.Module):
         if attention_mask is not None:
             attention_scores = attention_scores + attention_mask
 
-        # Normalize the attention scores to probabilities.
+        if not self.sparse:
+            attention_probs = nn.Softmax(dim=-1)(attention_scores)
+        else:
+            attention_probs = entmax_bisect(X = attention_scores,alpha = self.alpha)
 
-        attention_probs = nn.Softmax(dim=-1)(attention_scores)
-        #print(attention_probs.shape)
-        attention_probs = self.adaptive_span(attention_probs)
+        if self.adapt_span_bool:
+            attention_probs = self.adaptive_span(attention_probs)
 
-        # This is actually dropping out entire tokens to attend to, which might
-        # seem a bit unusual, but is taken from the original Transformer paper.
         attention_probs = self.dropout(attention_probs)
 
         context_layer = torch.matmul(attention_probs, value_layer)
@@ -171,9 +172,9 @@ class BertCrossattLayer(nn.Module):
                         
     output.shape [128,20,768]
     """
-    def __init__(self, config,adapt_span_params):
+    def __init__(self, config, params):
         super().__init__()
-        self.att = BertAttention(config,adapt_span_params=adapt_span_params)
+        self.att = BertAttention(config, params = params)
         self.output = BertAttOutput(config)
 
     def forward(self, input_tensor, ctx_tensor, ctx_att_mask=None):
@@ -188,9 +189,9 @@ class BertSelfattLayer(nn.Module):
                              attention_mask = torch.rand(128,1,1,20))
     output.shape [128, 20, 768]
     """
-    def __init__(self, config, adapt_span_params):
+    def __init__(self, config, params):
         super(BertSelfattLayer, self).__init__()
-        self.self = BertAttention(config, adapt_span_params=adapt_span_params)
+        self.self = BertAttention(config, params = params)
         self.output = BertAttOutput(config)
 
     def forward(self, input_tensor, attention_mask):
@@ -246,9 +247,9 @@ class BertLayer(nn.Module):
     output = bert_layer(torch.rand(128,20,768),torch.rand(128,1,1,20))
     output.shape [128,20,768]
     """
-    def __init__(self, config, adapt_span_params):
+    def __init__(self, config, params):
         super(BertLayer, self).__init__()
-        self.attention = BertSelfattLayer(config,adapt_span_params=adapt_span_params)
+        self.attention = BertSelfattLayer(config, params)
         self.intermediate = BertIntermediate(config)
         self.output = BertOutput(config)
 
@@ -272,14 +273,14 @@ class LXRTXLayer(nn.Module):
     visn_output.shape: [128,36,768]
     
     """
-    def __init__(self, config,adapt_span_params):
+    def __init__(self, config, params):
         super().__init__()
         # The cross-attention Layer
-        self.visual_attention = BertCrossattLayer(config,adapt_span_params=adapt_span_params)
+        self.visual_attention = BertCrossattLayer(config, params)
 
         # Self-attention Layers
-        self.lang_self_att = BertSelfattLayer(config,adapt_span_params=adapt_span_params)
-        self.visn_self_att = BertSelfattLayer(config,adapt_span_params=adapt_span_params)
+        self.lang_self_att = BertSelfattLayer(config, params)
+        self.visn_self_att = BertSelfattLayer(config, params)
 
         # Intermediate and Output Layers (FFNs)
         self.lang_inter = BertIntermediate(config)
@@ -374,7 +375,7 @@ class LXRTEncoder(nn.Module):
     visn_feats.shape: [128,36,768]
 
     """
-    def __init__(self, config, adapt_span_params):
+    def __init__(self, config, params):
         super().__init__()
 
         # Obj-level image embedding layer
@@ -390,13 +391,13 @@ class LXRTEncoder(nn.Module):
         # Layers
         # Using self.layer instead of self.l_layer to support loading BERT weights.
         self.layer = nn.ModuleList(
-            [BertLayer(config,adapt_span_params=adapt_span_params) for _ in range(self.num_l_layers)]
+            [BertLayer(config, params = params) for _ in range(self.num_l_layers)]
         )
         self.r_layers = nn.ModuleList(
-            [BertLayer(config,adapt_span_params=adapt_span_params) for _ in range(self.num_r_layers)]
+            [BertLayer(config, params = params) for _ in range(self.num_r_layers)]
         )
         self.x_layers = nn.ModuleList(
-            [LXRTXLayer(config,adapt_span_params=adapt_span_params) for _ in range(self.num_x_layers)]
+            [LXRTXLayer(config, params = params) for _ in range(self.num_x_layers)]
         )
         
 
@@ -455,10 +456,10 @@ class LXRTModel(BertPreTrainedModel):
     
     """
 
-    def __init__(self, config, adapt_span_params):
+    def __init__(self, config, params):
         super().__init__(config)
         self.embeddings = BertEmbeddings(config)
-        self.encoder = LXRTEncoder(config,adapt_span_params)
+        self.encoder = LXRTEncoder(config, params)
         self.pooler = BertPooler(config)
         self.apply(self.init_bert_weights)
 
@@ -533,13 +534,13 @@ class VisualBertForLXRFeature(BertPreTrainedModel):
               
     output.shape -> [128,768]          ,
     """
-    def __init__(self, config, adapt_span_params, mode='lxr',):
+    def __init__(self, config, params, mode='lxr',):
         """
         :param config:
         :param mode:  Number of visual layers
         """
         super().__init__(config)
-        self.bert = LXRTModel(config,adapt_span_params)
+        self.bert = LXRTModel(config,params)
         self.mode = mode
         self.apply(self.init_bert_weights)
 
@@ -567,10 +568,10 @@ class LXRTEncoder_(nn.Module):
         Output:
             output = lxrt_encoder(sent, (feat.cuda(), pos.cuda())) # [128,768]
     """
-    def __init__(self, args, max_seq_length, adapt_span_params, mode='x'):
+    def __init__(self, max_seq_length, params, mode='x'):
         super().__init__()
         self.max_seq_length = max_seq_length
-        set_visual_config(args)
+        set_visual_config(params)
 
         # Using the bert tokenizer
         self.tokenizer = BertTokenizer.from_pretrained(
@@ -581,12 +582,11 @@ class LXRTEncoder_(nn.Module):
         # Build LXRT Model
         self.model = VisualBertForLXRFeature.from_pretrained(
             "bert-base-uncased",
-            adapt_span_params=adapt_span_params,
+            params = params,
             mode=mode,
-            args = args,
         )
 
-        if args.from_scratch:
+        if params['from_scratch']:
             print("initializing all the weights")
             self.model.apply(self.model.init_bert_weights)
 
@@ -648,14 +648,13 @@ class LXRTEncoder_(nn.Module):
         self.model.load_state_dict(state_dict, strict=False)
 
 class VQAModel_Adaptive(nn.Module):
-    def __init__(self, num_answers,args,adapt_span_params):
+    def __init__(self, num_answers,params):
         super().__init__()
         
         # Build LXRT encoder
         self.lxrt_encoder = LXRTEncoder_(
-            args,
             max_seq_length=MAX_VQA_LENGTH,
-            adapt_span_params=adapt_span_params
+            params = params
         )
         hid_dim = self.lxrt_encoder.dim
         
@@ -667,7 +666,10 @@ class VQAModel_Adaptive(nn.Module):
             nn.Linear(hid_dim * 2, num_answers)
         )
         self.logit_fc.apply(self.lxrt_encoder.model.init_bert_weights)
-        print("Using adaptive variant")
+        if params['adapt_span_enabled']:
+            print("Using Adaptive Variant")
+        if params['sparse_enabled']:
+            print("Sparse Enabled")
         
     def forward(self, feat, pos, sent):
         """

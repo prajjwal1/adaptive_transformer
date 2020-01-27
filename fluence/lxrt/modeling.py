@@ -788,7 +788,8 @@ class BertPreTrainedModel(nn.Module):
         # Load config
         config_file = os.path.join(serialization_dir, CONFIG_NAME)
         config = BertConfig.from_json_file(config_file)
-        config.sparse = args.sparse
+        #config.sparse = args.sparse
+        config.num_attention_heads = args.num_attention_heads
         logger.info("Model config {}".format(config))
         # Instantiate model.
         model = cls(config, *inputs, **kwargs)

@@ -10,8 +10,6 @@ from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
 import torch.nn as nn
 from tqdm import tqdm
-from transformers import BertTokenizer
-import matplotlib.pyplot
 
 from utils import load_obj_tsv
 from optimizers.lamb import Lamb
@@ -21,8 +19,7 @@ from pretrain.qa_answer_table import load_lxmert_qa
 from lxrt.entry import LXRTEncoder
 from activation import GeLU
 from transformers.modeling_bert import BertLayerNorm
-from pretrain.qa_answer_table import load_lxmert_qa
-from models.lxrt_adaptive import Model_Args
+#from pretrain.qa_answer_table import load_lxmert_qa
 from learner import Learner
 
 parser = argparse.ArgumentParser()
@@ -46,6 +43,11 @@ parser.add_argument(
     )
 parser.add_argument(
         "--sparse",
+        action="store_true",
+        help="Use Adaptive Attention Span",
+    )
+parser.add_argument(
+        "--sparse_train",
         action="store_true",
         help="Use Adaptive Attention Span",
     )
@@ -91,19 +93,15 @@ def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, 
 train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train,nominival', args.tiny, args.bs,True,True)
 valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',args.tiny,args.bs,True,True)
         
-model_args = Model_Args(9,6,6)
-model_args.sparse = args.sparse
 
-if args.adaptive:
-    
-    adapt_span_params = {'adapt_span_enabled': True, 'attn_span': 1024, 'adapt_span_loss_coeff': 0.000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0.6, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs, 'mask_size': [20,36]}
-    
-    model = VQAModel_Adaptive(train_tuple[0].num_answers,model_args,adapt_span_params)
-else:
-    model = VQAModel(train_tuple[0].num_answers,model_args)
-    
-learn = Learner(model,train_tuple,valid_tuple,args.adaptive)
 
-learn.train(5)
+params = {'adapt_span_enabled': args.adaptive, 'attn_span': 1024, 'adapt_span_loss_coeff': 0.000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0.002, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs, 'mask_size': [20,36], 'sparse_enabled': args.sparse, 'num_attention_heads': 4, 'layer_sizes': {'lang':6,'cross':4,'vision':4}, 'from_scratch': False }
+
+model = VQAModel_Adaptive(train_tuple[0].num_answers, params)
+
+    
+learn = Learner(model,train_tuple,valid_tuple,args.adaptive,args.sparse_train)
+
+learn.train(1)
 
 

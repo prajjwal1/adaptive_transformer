@@ -4,6 +4,7 @@ from pathlib import Path
 import torch
 from torch import nn
 from optimizers.lamb import Lamb
+from optimizers.lookahead import Lookahead
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CyclicLR
 from pretrain.qa_answer_table import load_lxmert_qa
@@ -15,11 +16,12 @@ DataTuple = collections.namedtuple("DataTuple", 'dataset loader evaluator')
 load_lxmert_qa_path = home+'/snap/pretrained/model'
 
 class Learner():
-    def __init__(self, model, train_tuple, val_tuple,adaptive,sparse_train):
+    def __init__(self, model, train_tuple, val_tuple, adaptive, measure_flops):
         self.model = model
         self.criterion = nn.BCEWithLogitsLoss()
-        self.optim = AdamW(self.model.parameters(), lr = 5e-5)#Lamb(params=self.model.parameters(),lr=1e-4, weight_decay=1.2e-6, min_trust=0.25)  
-        self.lr_scheduler = CyclicLR(self.optim, base_lr=5e-5, max_lr = 1e-4, cycle_momentum=False)  #get_cosine_schedule_with_warmup(self.optim, 8000)
+        base_optim = Lamb(params=self.model.parameters(),lr=1e-4, weight_decay=1.2e-6, min_trust=0.25)
+        self.optim = Lookahead(base_optimizer=base_optim, k=5, alpha=0.8)
+        self.lr_scheduler = CyclicLR(self.optim, base_lr=5e-5, max_lr = 1e-4, cycle_momentum=False)  
         self.train_tuple = train_tuple
         self.valid_tuple = val_tuple
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -27,15 +29,10 @@ class Learner():
         os.makedirs(self.output, exist_ok=True)
         self.model.to(self.device)
         self.adaptive = adaptive
-        self.sparse_train = sparse_train
-        
+        self.measure_flops = measure_flops
         load_lxmert_qa(load_lxmert_qa_path, self.model, label2ans= self.train_tuple[0].label2ans)
         
         num_epochs = 10
-#         if self.sparse_train:
-#             self.decay = CosineDecay(0.5, len(self.train_tuple[0])*num_epochs)
-#             self.mask = Masking(self.optim, self.decay)
-#             self.mask.add_module(self.model, 0.05)
         
     def train(self,num_epochs):
         dset, loader, evaluator = self.train_tuple
@@ -79,10 +76,7 @@ class Learner():
                     
                 nn.utils.clip_grad_norm_(self.model.parameters(), 5.)
                 
-#                 if self.sparse_train:
-#                     self.mask.step()
                    
-#                 else:
                 self.optim.step()
                 self.lr_scheduler.step()
                 
@@ -111,13 +105,12 @@ class Learner():
             
             log_str += 'Loss: ' + str(loss.item()) +"\t"
             if self.adaptive:
-                log_str += "\tAdapt Span Loss: " + str(adapt_span_loss) + "\n"
+                log_str += "\tAdapt Span Loss: " + str(adapt_span_loss.item()) + "\n"
                     
-            macs, params = profile(self.model, inputs=(feats,boxes,sent))
-            macs, params = clever_format([macs, params], "%.3f")
-            
-            if self.sparse_train:
-                self.mask.at_end_of_epoch()
+            if self.measure_flops:
+                macs, params = profile(self.model, inputs=(feats,boxes,sent))
+                macs, params = clever_format([macs, params], "%.3f")
+                log_str += "\nMacs: " + macs + "\tParams: " + params + "\n"
             
             if self.adaptive:
                 for layer_idx, i in enumerate(self.model.lxrt_encoder.model.bert.encoder.layer):
@@ -140,7 +133,6 @@ class Learner():
                     l = i.attention.self.adaptive_span.get_current_avg_span()
                     log_str += "Vision %d %d\t" %(layer_idx,l)
             
-            log_str += "\nMacs: " + macs + "\tParams: " + params + "\n"
                 
             if self.valid_tuple is not None:  # Do Validation
                 valid_score = self.evaluate(self.valid_tuple)

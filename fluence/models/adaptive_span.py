@@ -15,7 +15,7 @@ class AdaptiveSpan(nn.Module):
         self.ramp_size = adapt_span_ramp
         self.bs = bs
         self.nb_heads = nb_heads
-        self.init_val = nn.Parameter(torch.Tensor([adapt_span_init]))
+        self.init_val = adapt_span_init
         self.adapt_cache = adapt_span_cache
         self.loss_coeff = adapt_span_loss_coeff
         self.shape = (self.bs, self.nb_heads,1, 1)

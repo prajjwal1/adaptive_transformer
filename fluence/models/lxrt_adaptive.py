@@ -6,7 +6,7 @@ from transformers.modeling_bert import BertLayerNorm
 from transformers import BertConfig
 from transformers import BertTokenizer
 from .lxmert_utils import BertPreTrainedModel, VISUAL_CONFIG, set_visual_config, InputFeatures, convert_sents_to_features
-from entmax import entmax_bisect
+from .entmax import EntmaxAlpha
 from .adaptive_span import AdaptiveSpan
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -49,17 +49,6 @@ class BertEmbeddings(nn.Module):
         return embeddings
     
 ## BertAttention
-
-class AlphaChooser(torch.nn.Module):
-
-    def __init__(self, head_count):
-        """head_count (int): number of attention heads"""
-        super(AlphaChooser, self).__init__()
-        self.pre_alpha = nn.Parameter(torch.randn(head_count))
-
-    def forward(self):
-        alpha = 1 + torch.sigmoid(self.pre_alpha)
-        return torch.clamp(alpha, min=1.01, max=2)
     
 class BertAttention(nn.Module):
     """
@@ -91,9 +80,10 @@ class BertAttention(nn.Module):
         
         self.adapt_span_bool = params['adapt_span_enabled']
         self.sparse = params['sparse_enabled']
+        
         if self.sparse:
-            alpha = AlphaChooser(1)
-            self.alpha =  nn.Parameter(alpha())
+            self.entmax_alpha = EntmaxAlpha(self.num_attention_heads)
+            
         if self.adapt_span_bool:
             self.adaptive_span = AdaptiveSpan(**params)
         
@@ -121,10 +111,10 @@ class BertAttention(nn.Module):
         if attention_mask is not None:
             attention_scores = attention_scores + attention_mask
 
-        if not self.sparse:
-            attention_probs = nn.Softmax(dim=-1)(attention_scores)
+        if self.sparse:
+            attention_probs = self.entmax_alpha(attention_scores)
         else:
-            attention_probs = entmax_bisect(X = attention_scores,alpha = self.alpha)
+            attention_probs = nn.Softmax(dim=-1)(attention_scores)
 
         if self.adapt_span_bool:
             attention_probs = self.adaptive_span(attention_probs)

@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 tiny,fast = True,False
 
-TINY_IMG_NUM = 50
+TINY_IMG_NUM = 500
 
 csv.field_size_limit(sys.maxsize)
 FIELDNAMES = ["img_id", "img_h", "img_w", "objects_id", "objects_conf",

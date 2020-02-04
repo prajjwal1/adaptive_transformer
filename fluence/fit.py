@@ -3,23 +3,20 @@ import os
 import collections
 import argparse
 from pathlib import Path
+import time
 
-import numpy as np
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
 import torch.nn as nn
 from tqdm import tqdm
 
+from models.lxrt_adaptive import VQAModel_Adaptive
+
 from utils import load_obj_tsv
 from optimizers.lamb import Lamb
 from dataset.vqa import VQADataset,VQATorchDataset, VQAEvaluator
 
-from pretrain.qa_answer_table import load_lxmert_qa
-from lxrt.entry import LXRTEncoder
-from activation import GeLU
-from transformers.modeling_bert import BertLayerNorm
-#from pretrain.qa_answer_table import load_lxmert_qa
 from learner import Learner
 
 parser = argparse.ArgumentParser()
@@ -30,6 +27,12 @@ parser.add_argument(
         type=int,
         required=True,
         help="batch size",
+    )
+parser.add_argument(
+        "--epochs",
+        type=int,
+        required=True,
+        help="epochs",
     )
 parser.add_argument(
         "--tiny",
@@ -46,18 +49,10 @@ parser.add_argument(
         action="store_true",
         help="Use Adaptive Attention Span",
     )
-parser.add_argument(
-        "--sparse_train",
-        action="store_true",
-        help="Use Adaptive Attention Span",
-    )
 args = parser.parse_args()
 print(args)
 
-if args.adaptive:
-    from models.lxrt_adaptive import VQAModel_Adaptive
-else:
-    from tasks.vqa_model import VQAModel
+
     
 
 home = str(Path.home())
@@ -100,8 +95,29 @@ params = {'adapt_span_enabled': args.adaptive, 'attn_span': 1024, 'adapt_span_lo
 model = VQAModel_Adaptive(train_tuple[0].num_answers, params)
 
     
-learn = Learner(model,train_tuple,valid_tuple,args.adaptive,args.sparse_train)
+learn = Learner(model,train_tuple,valid_tuple,args.adaptive, False)
 
-learn.train(1)
+#############################
+from datetime import datetime
+present_time = datetime.now().time() # time object
+present_time = present_time.strftime("%H:%M:%S")
+log_str = "######################################################################\n" 
+log_str += "\n\nTime: " + str(present_time)
+log_str += "\nSettings: " + "Sparse: " + str(args.sparse) + "\t" + "Adaptive Span: " + str(args.adaptive) + "\t" + "Tiny: " + str(args.tiny) + "\t" + "Batch size: " + str(args.bs) + "\n"
+from pathlib import Path
+home = str(Path.home())
+output = home+'/snap/'
+t0 = time.time()
+##############################
 
+learn.train(args.epochs)
+
+elapsed_time = time.time()-t0
+
+log_str += str(elapsed_time)
+log_str += "\n#####################################################################\n"
+
+with open(output + "/log.log", 'a') as f:
+    f.write(log_str)
+    f.flush()
 

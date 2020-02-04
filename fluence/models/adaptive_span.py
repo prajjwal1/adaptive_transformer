@@ -8,7 +8,7 @@ import torch.nn.functional as F
 class AdaptiveSpan(nn.Module):
     
     def __init__(self, adapt_span_enabled, attn_span, adapt_span_loss_coeff, adapt_span_ramp, adapt_span_init,
-                 adapt_span_cache, nb_heads, bs, mask_size, sparse_enabled, num_attention_heads, layer_sizes,from_scratch):
+                 adapt_span_cache, nb_heads, bs, mask_size):
         
         super(AdaptiveSpan,self).__init__()
         self.attn_span = attn_span    # [attn_span]

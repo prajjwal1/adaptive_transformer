@@ -8,6 +8,7 @@ from transformers import BertTokenizer
 from .lxmert_utils import BertPreTrainedModel, VISUAL_CONFIG, set_visual_config, InputFeatures, convert_sents_to_features
 from .entmax import EntmaxAlpha
 from .adaptive_span import AdaptiveSpan
+from .layerdrop import LayerDrop_Bert, LayerDrop_Cross
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 MAX_VQA_LENGTH = 20
@@ -85,7 +86,9 @@ class BertAttention(nn.Module):
             self.entmax_alpha = EntmaxAlpha(self.num_attention_heads)
             
         if self.adapt_span_bool:
-            self.adaptive_span = AdaptiveSpan(**params)
+            self.adaptive_span = AdaptiveSpan(params['adapt_span_enabled'], params['attn_span'],
+                                              params['adapt_span_loss_coeff'], params['adapt_span_ramp'],                                                                     params['adapt_span_init'], params['adapt_span_cache'], 
+                                              params['nb_heads'], params['bs'], params['mask_size'])
         
 
     def transpose_for_scores(self, x):
@@ -369,6 +372,7 @@ class LXRTEncoder(nn.Module):
         super().__init__()
 
         # Obj-level image embedding layer
+        self.params = params
         self.visn_fc = VisualFeatEncoder(config)
 
         # Number of layers
@@ -390,6 +394,12 @@ class LXRTEncoder(nn.Module):
             [LXRTXLayer(config, params = params) for _ in range(self.num_x_layers)]
         )
         
+        if self.params['layerdrop_enabled']==True:
+            self.layer = LayerDrop_Bert(self.layer, self.params['layerdrop_num_layers'])
+            self.r_layers = LayerDrop_Bert(self.r_layers, self.params['layerdrop_num_layers'])
+            self.x_layers = LayerDrop_Cross(self.x_layers, self.params['layerdrop_num_layers'])
+        
+        
 
     def forward(self, lang_feats, lang_attention_mask,
                 visn_feats, visn_attention_mask=None):
@@ -398,17 +408,22 @@ class LXRTEncoder(nn.Module):
         #       Keep this design to allow loading BERT weights.
         visn_feats = self.visn_fc(visn_feats)   #  [bs, 36, 768]
 
-        # Run language layers
-        for layer_module in self.layer:
-            lang_feats = layer_module(lang_feats, lang_attention_mask)
-
-        # Run relational layers
-        for layer_module in self.r_layers:
-            visn_feats = layer_module(visn_feats, visn_attention_mask)
-
-        # Run cross-modality layers
-        for layer_module in self.x_layers:
-            lang_feats, visn_feats = layer_module(lang_feats, lang_attention_mask,
+        
+        if not self.params['layerdrop_enabled']:
+            # Run language layers
+            for layer_module in self.layer:
+                lang_feats = layer_module(lang_feats, lang_attention_mask)
+            # Run relational layers
+            for layer_module in self.r_layers:
+                visn_feats = layer_module(visn_feats, visn_attention_mask)
+            # Run cross-modality layers
+            for layer_module in self.x_layers:
+                lang_feats, visn_feats = layer_module(lang_feats, lang_attention_mask,
+                                                  visn_feats, visn_attention_mask)
+        else:
+            lang_feats = self.layer(lang_feats, lang_attention_mask)
+            visn_feats = self.r_layers(visn_feats, visn_attention_mask)
+            lang_feats, visn_feats = self.x_layers(lang_feats, lang_attention_mask,
                                                   visn_feats, visn_attention_mask)
 
         return lang_feats, visn_feats
@@ -660,7 +675,9 @@ class VQAModel_Adaptive(nn.Module):
             print("Using Adaptive Variant")
         if params['sparse_enabled']:
             print("Sparse Enabled")
-        
+        if params['layerdrop_enabled']:
+            print("LayerDrop is enabled")
+            
     def forward(self, feat, pos, sent):
         """
         b -- batch_size, o -- object_number, f -- visual_feature_size

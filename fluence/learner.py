@@ -1,4 +1,4 @@
-import os
+import os,time
 import collections
 from pathlib import Path
 import torch
@@ -40,6 +40,7 @@ class Learner():
         iter_wrapper = (lambda x: tqdm(x, total=len(loader))) 
 
         for epoch in range(num_epochs):
+            t0 = time.time()
             quesid2ans = {}
             for i, (ques_id, feats, boxes, sent, target) in iter_wrapper(enumerate(loader)):
                 self.model.train()
@@ -143,6 +144,9 @@ class Learner():
                 log_str += "Epoch %d: Valid %0.2f\n" % (epoch, valid_score * 100.) + \
                            "Epoch %d: Best %0.2f\n" % (epoch, best_valid * 100.)
 
+            current_time = time.time()-t0
+            print(current_time)
+            log_str += "Time elpased for epoch %f\n" % (current_time)
             print(log_str, end='')
 
             with open(self.output + "/log.log", 'a') as f:

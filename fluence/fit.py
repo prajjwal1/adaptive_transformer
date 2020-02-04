@@ -49,11 +49,13 @@ parser.add_argument(
         action="store_true",
         help="Use Adaptive Attention Span",
     )
+parser.add_argument(
+        "--layerdrop",
+        action="store_true",
+        help="Use Adaptive Attention Span",
+    )
 args = parser.parse_args()
 print(args)
-
-
-    
 
 home = str(Path.home())
 MSCOCO_IMGFEAT_ROOT = home + '/data/mscoco_imgfeat/'
@@ -71,6 +73,7 @@ torch.cuda.is_available()
 
 
 DataTuple = collections.namedtuple("DataTuple", 'dataset loader evaluator')
+num_workers = 0 if torch.cuda.is_available() else 1
 
 def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, shuffle=False, drop_last=False) -> DataTuple:
     dset = VQADataset(path,splits)
@@ -79,7 +82,7 @@ def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, 
     pin_memory = True if torch.cuda.is_available() else False
     data_loader = DataLoader(
         tset, batch_size=bs,
-        shuffle=shuffle, num_workers=1,
+        shuffle=shuffle, num_workers=num_workers,
         drop_last=drop_last, pin_memory=pin_memory
     )
 
@@ -90,12 +93,12 @@ valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',args.t
         
 
 
-params = {'adapt_span_enabled': args.adaptive, 'attn_span': 1024, 'adapt_span_loss_coeff': 0.000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0.002, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs, 'mask_size': [20,36], 'sparse_enabled': args.sparse, 'num_attention_heads': 4, 'layer_sizes': {'lang':6,'cross':4,'vision':4}, 'from_scratch': False }
+params = {'adapt_span_enabled': args.adaptive, 'attn_span': 1024, 'adapt_span_loss_coeff': 0.000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0.002, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs, 'mask_size': [20,36], 'sparse_enabled': args.sparse, 'num_attention_heads': 4, 'layer_sizes': {'lang':9,'cross':5,'vision':5}, 'from_scratch': False, 'layerdrop_enabled': args.layerdrop, 'layerdrop_num_layers': 2}
 
 model = VQAModel_Adaptive(train_tuple[0].num_answers, params)
 
     
-learn = Learner(model,train_tuple,valid_tuple,args.adaptive, False)
+learn = Learner(model,train_tuple,valid_tuple,args.adaptive, True)
 
 #############################
 from datetime import datetime
@@ -108,13 +111,16 @@ from pathlib import Path
 home = str(Path.home())
 output = home+'/snap/'
 t0 = time.time()
+with open(output + "/log.log", 'a') as f:
+    f.write(log_str)
+    f.flush()
 ##############################
 
 learn.train(args.epochs)
 
 elapsed_time = time.time()-t0
 
-log_str += str(elapsed_time)
+log_str = str(elapsed_time)
 log_str += "\n#####################################################################\n"
 
 with open(output + "/log.log", 'a') as f:

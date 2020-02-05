@@ -16,7 +16,7 @@ DataTuple = collections.namedtuple("DataTuple", 'dataset loader evaluator')
 load_lxmert_qa_path = home+'/snap/pretrained/model'
 
 class Learner():
-    def __init__(self, model, train_tuple, val_tuple, adaptive, measure_flops):
+    def __init__(self, model, train_tuple, val_tuple, adaptive, load_model, measure_flops):
         self.model = model
         self.criterion = nn.BCEWithLogitsLoss()
         base_optim = Lamb(params=self.model.parameters(),lr=1e-4, weight_decay=1.2e-6, min_trust=0.25)
@@ -30,9 +30,9 @@ class Learner():
         self.model.to(self.device)
         self.adaptive = adaptive
         self.measure_flops = measure_flops
-        load_lxmert_qa(load_lxmert_qa_path, self.model, label2ans= self.train_tuple[0].label2ans)
-        
-        num_epochs = 10
+        if load_model==False:
+            load_lxmert_qa(load_lxmert_qa_path, self.model, label2ans= self.train_tuple[0].label2ans)
+          
         
     def train(self,num_epochs):
         dset, loader, evaluator = self.train_tuple
@@ -116,23 +116,23 @@ class Learner():
             if self.adaptive:
                 for layer_idx, i in enumerate(self.model.lxrt_encoder.model.bert.encoder.layer):
                     l = i.attention.self.adaptive_span.get_current_avg_span()
-                    log_str += "Language %d %d\t" %(layer_idx,l)
-
+                    log_str += "Self Language %d %d\t" %(layer_idx,l)
+                log_str+="\n"
                 for layer_idx, i in enumerate(self.model.lxrt_encoder.model.bert.encoder.x_layers):
                     l = i.visual_attention.att.adaptive_span.get_current_avg_span()
-                    log_str += "Cross Attention %d %d\t" %(layer_idx,l)
-
+                    log_str += "Cross %d %d\t" %(layer_idx,l)
+                log_str+="\n"
                 for layer_idx, i in enumerate(self.model.lxrt_encoder.model.bert.encoder.x_layers):
                     l = i.lang_self_att.self.adaptive_span.get_current_avg_span()
-                    log_str += "Self Language %d %d\t" %(layer_idx,l)
-
+                    log_str += "Cross Self Language %d %d\t" %(layer_idx,l)
+                log_str+="\n"
                 for layer_idx, i in enumerate(self.model.lxrt_encoder.model.bert.encoder.x_layers):
                     l = i.visn_self_att.self.adaptive_span.get_current_avg_span()
-                    log_str += "Self Vision %d %d\t" %(layer_idx,l) 
-
+                    log_str += "Cross Self Vision %d %d\t" %(layer_idx,l) 
+                log_str+="\n"
                 for layer_idx, i in enumerate(self.model.lxrt_encoder.model.bert.encoder.r_layers):
                     l = i.attention.self.adaptive_span.get_current_avg_span()
-                    log_str += "Vision %d %d\t" %(layer_idx,l)
+                    log_str += "Self Vision %d %d\t" %(layer_idx,l)
             
                 
             if self.valid_tuple is not None:  # Do Validation

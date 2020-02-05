@@ -19,6 +19,7 @@ from dataset.vqa import VQADataset,VQATorchDataset, VQAEvaluator
 
 from learner import Learner
 
+home = str(Path.home())
 parser = argparse.ArgumentParser()
 
 parser.add_argument(
@@ -51,6 +52,11 @@ parser.add_argument(
     )
 parser.add_argument(
         "--layerdrop",
+        action="store_true",
+        help="Use Adaptive Attention Span",
+    )
+parser.add_argument(
+        "--load_model",
         action="store_true",
         help="Use Adaptive Attention Span",
     )
@@ -98,7 +104,11 @@ params = {'adapt_span_enabled': args.adaptive, 'attn_span': 1024, 'adapt_span_lo
 model = VQAModel_Adaptive(train_tuple[0].num_answers, params)
 
     
-learn = Learner(model,train_tuple,valid_tuple,args.adaptive, True)
+learn = Learner(model,train_tuple,valid_tuple, args.adaptive, args.load_model, True)
+
+if args.load_model:
+    print("Using BEST Model's weights")
+    learn.load(home+'/snap/BEST')
 
 #############################
 from datetime import datetime
@@ -118,6 +128,7 @@ with open(output + "/log.log", 'a') as f:
 
 learn.train(args.epochs)
 
+##############################
 elapsed_time = time.time()-t0
 
 log_str = str(elapsed_time)

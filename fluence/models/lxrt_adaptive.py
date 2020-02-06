@@ -676,7 +676,7 @@ class VQAModel_Adaptive(nn.Module):
         if params['sparse_enabled']:
             print("Sparse Enabled")
         if params['layerdrop_enabled']:
-            print("LayerDrop is enabled")
+            print("LayerDrop is enabled with dropping rate set to ", params['layerdrop_num_layers'])
             
     def forward(self, feat, pos, sent):
         """

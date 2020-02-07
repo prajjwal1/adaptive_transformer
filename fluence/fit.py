@@ -99,7 +99,7 @@ valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',args.t
         
 
 
-params = {'adapt_span_enabled': args.adaptive, 'attn_span': 1024, 'adapt_span_loss_coeff': 0.000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0.002, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs, 'mask_size': [20,36], 'sparse_enabled': args.sparse, 'num_attention_heads': 4, 'layer_sizes': {'lang':10,'cross':6,'vision':6}, 'from_scratch': False, 'layerdrop_enabled': args.layerdrop, 'layerdrop_num_layers': 1}
+params = {'adapt_span_enabled': args.adaptive, 'attn_span': 1024, 'adapt_span_loss_coeff': 0.000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0.002, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs, 'mask_size': [20,36], 'sparse_enabled': args.sparse, 'num_attention_heads': 4, 'layer_sizes': {'lang':9,'cross':5,'vision':5}, 'from_scratch': False, 'layerdrop_enabled': args.layerdrop, 'layerdrop_num_layers': 1}
 
 model = VQAModel_Adaptive(train_tuple[0].num_answers, params)
 

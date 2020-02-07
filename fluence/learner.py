@@ -8,9 +8,9 @@ from optimizers.lookahead import Lookahead
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CyclicLR
 from pretrain.qa_answer_table import load_lxmert_qa
+from models.lxmert_utils import load_lxmert_qa
 from tqdm import tqdm
 from thop import profile,clever_format
-from models.sparse_learning import CosineDecay, Masking
 home = str(Path.home())
 DataTuple = collections.namedtuple("DataTuple", 'dataset loader evaluator')
 load_lxmert_qa_path = home+'/snap/pretrained/model'

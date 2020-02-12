@@ -134,7 +134,7 @@ class BertAttention(nn.Module):
             attention_probs = self.adaptive_span(attention_probs)
 
         att_dict = {'attention_scores': attention_scores, 'attention_probs': attention_probs,
-                   'entmax_alpha': self.entmax_alpha.alpha_chooser}
+                   'entmax_alpha': self.entmax_alpha.alpha_chooser, 'value_layer': value_layer}
         
         attention_probs = self.dropout(attention_probs)
        

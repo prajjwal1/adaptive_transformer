@@ -112,12 +112,14 @@ class BertAttention(nn.Module):
         attention_scores = attention_scores / math.sqrt(self.attention_head_size)
         # Apply the attention mask is (precomputed for all layers in BertModel forward() function)
         if attention_mask is not None:
-            attention_scores = attention_scores + attention_mask
-
+            attention_scores = attention_scores + attention_mask    
+            
         if self.sparse:
+            torch.save(attention_scores, home+'/snap/attention_scores.pth')
             attention_probs = self.entmax_alpha(attention_scores)
+            torch.save(attention_probs, home+'/snap/attention_probs.pth')
         else:
-            attention_probs = nn.Softmax(dim=-1)(attention_scores)
+            attention_probs = nn.Softmax(dim=-1)(attention_scores)    
 
         if self.adapt_span_bool:
             attention_probs = self.adaptive_span(attention_probs)
@@ -607,13 +609,9 @@ class LXRTEncoder_(nn.Module):
         train_features = convert_sents_to_features(
             sents, self.max_seq_length, self.tokenizer)
 
-        input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long).to(device)
-        input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long).to(device)
-        segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long).to(device)
-        
-        #input_ids.shape, [128,20]
-        #input_mask.shape, [128,20]
-        #segment_ids.shape [128,20]
+        input_ids = torch.tensor([f.input_ids for f in train_features], dtype=torch.long).to(device) #[128,20]
+        input_mask = torch.tensor([f.input_mask for f in train_features], dtype=torch.long).to(device) #[128,20]
+        segment_ids = torch.tensor([f.segment_ids for f in train_features], dtype=torch.long).to(device) #[128,20]
         
         output = self.model(input_ids, segment_ids, input_mask,
                             visual_feats=feats,

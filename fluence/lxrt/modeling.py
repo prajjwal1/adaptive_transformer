@@ -348,7 +348,9 @@ class BertAttention(nn.Module):
 
         # Normalize the attention scores to probabilities.
         if not self.sparse:
+            torch.save(attention_scores, home+'/snap/attention_scores.pth')
             attention_probs = nn.Softmax(dim=-1)(attention_scores)
+            torch.save(attention_probs, home+'/snap/attention_probs.pth')
         else:
             attention_probs = entmax_bisect(attention_scores,self.alpha)
             

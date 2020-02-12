@@ -13,7 +13,7 @@ from torch import nn
 from .file_utils import cached_path
 
 from transformers import BertConfig
-from .lxrt_adaptive import BertLayerNorm
+from transformers.modeling_bert import BertLayerNorm
 
 PRETRAINED_MODEL_ARCHIVE_MAP = {
     'bert-base-uncased': "https://s3.amazonaws.com/models.huggingface.co/bert/bert-base-uncased.tar.gz",

@@ -2,6 +2,8 @@
 import torch
 from torch import nn
 from torch.autograd import Function
+from pathlib import Path
+home = str(Path.home())
 
 class AlphaChooser(torch.nn.Module):
 
@@ -27,7 +29,6 @@ class EntmaxAlpha(nn.Module):
         expanded_alpha = self.alpha.unsqueeze(0).unsqueeze(-1).unsqueeze(-1) # [1,nb_heads,1,1]
         expanded_alpha = expanded_alpha.expand((batch_size, -1, query_len,1))# [bs, nb_heads, query_len,1]
         p_star = entmax_bisect(att_scores, expanded_alpha)
-
         return p_star
     
     

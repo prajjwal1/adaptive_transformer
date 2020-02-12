@@ -11,7 +11,7 @@ from torch.utils.data.dataloader import DataLoader
 import torch.nn as nn
 from tqdm import tqdm
 
-from models.lxrt_adaptive import VQAModel_Adaptive
+from models.lxmert_adaptive_att import VQAModel_Adaptive
 
 from utils import load_obj_tsv
 from optimizers.lamb import Lamb
@@ -94,8 +94,8 @@ def get_data_tuple(path: str, mscoco_path: str, splits: str, tiny: bool,bs:int, 
 
     return DataTuple(dataset=dset, loader=data_loader, evaluator=evaluator)
 
-train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train,nominival', args.tiny, args.bs,True,True)
-valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',args.tiny,args.bs,True,True)
+train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train,nominival', args.tiny, args.bs,False,True)
+valid_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT,'minival',args.tiny,args.bs,False,True)
         
 
 

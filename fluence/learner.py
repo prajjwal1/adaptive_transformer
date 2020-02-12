@@ -1,4 +1,4 @@
-import os,time
+import os,time,sys
 import collections
 from pathlib import Path
 import torch
@@ -19,9 +19,9 @@ class Learner():
     def __init__(self, model, train_tuple, val_tuple, adaptive, load_model, measure_flops):
         self.model = model
         self.criterion = nn.BCEWithLogitsLoss()
-        base_optim = Lamb(params=self.model.parameters(),lr=1e-4, weight_decay=1.2e-6, min_trust=0.25)
+        base_optim = Lamb(params=self.model.parameters(),lr=1e-5, weight_decay=1.2e-6, min_trust=0.25)
         self.optim = Lookahead(base_optimizer=base_optim, k=5, alpha=0.8)
-        self.lr_scheduler = CyclicLR(self.optim, base_lr=5e-5, max_lr = 1e-4, cycle_momentum=False)  
+        self.lr_scheduler = CyclicLR(self.optim, base_lr=1e-5, max_lr = 5e-5, cycle_momentum=False)  
         self.train_tuple = train_tuple
         self.valid_tuple = val_tuple
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -46,10 +46,18 @@ class Learner():
                 self.model.train()
                 self.optim.zero_grad()
                 feats, boxes, target = feats.to(self.device), boxes.to(self.device), target.to(self.device)
-                logit = self.model(feats,boxes,sent)        
+                
+                logit, att_dict = self.model(feats,boxes,sent)  
+                torch.save(att_dict, home+'/snap/interpret.pth')
                 assert logit.dim() == target.dim() == 2
                 loss = self.criterion(logit,target)*logit.size(1)
+                print(loss)
                 
+                if not math.isfinite(loss):
+                    print("Loss is {}, stopping training".format(loss))
+                    print(loss)
+                    sys.exit(1)
+            
          #####################################################       
                 if self.adaptive:
                     

@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
 import torch.nn as nn
 from tqdm import tqdm
+torch.manual_seed(0)
 
 from models.lxmert_adaptive_att import VQAModel_Adaptive
 

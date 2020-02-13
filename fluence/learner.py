@@ -1,4 +1,4 @@
-import os,time,sys
+import os,time,sys, math
 import collections
 from pathlib import Path
 import torch
@@ -14,6 +14,7 @@ from thop import profile,clever_format
 home = str(Path.home())
 DataTuple = collections.namedtuple("DataTuple", 'dataset loader evaluator')
 load_lxmert_qa_path = home+'/snap/pretrained/model'
+torch.manual_seed(0)
 
 class Learner():
     def __init__(self, model, train_tuple, val_tuple, adaptive, load_model, measure_flops):
@@ -48,17 +49,15 @@ class Learner():
                 feats, boxes, target = feats.to(self.device), boxes.to(self.device), target.to(self.device)
                 
                 logit, att_dict = self.model(feats,boxes,sent)  
-                if i>=3350:
-                    torch.save(att_dict, home+'/snap/interpret.pth')
-                    torch.save(logit, home+'/snap/logit.pth')
-                    torch.save(target, home+'/snap/target.pth')
                 assert logit.dim() == target.dim() == 2
                 loss = self.criterion(logit,target)*logit.size(1)
-                print(loss)
                 
                 if not math.isfinite(loss):
                     print("Loss is {}, stopping training".format(loss))
                     print(loss)
+                    torch.save(att_dict, home+'/snap/interpret.pth')
+                    torch.save(logit, home+'/snap/logit.pth')
+                    torch.save(target, home+'/snap/target.pth')
                     sys.exit(1)
             
          #####################################################       

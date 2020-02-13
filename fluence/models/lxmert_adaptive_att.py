@@ -13,6 +13,7 @@ from dataset.vqa import VQADataset,VQATorchDataset, VQAEvaluator
 from pathlib import Path
 import collections
 from torch.utils.data.dataloader import DataLoader
+torch.manual_seed(0)
 
 home = str(Path.home())
 MSCOCO_IMGFEAT_ROOT = home + '/data/mscoco_imgfeat/'

@@ -10,9 +10,9 @@ from torch.utils.data import Dataset
 from torch.utils.data.dataloader import DataLoader
 import torch.nn as nn
 from tqdm import tqdm
-torch.manual_seed(0)
+#torch.manual_seed(0)
 
-from models.lxmert_adaptive_att import VQAModel_Adaptive
+from models.lxmert_adaptive import VQAModel_Adaptive
 
 from utils import load_obj_tsv
 from optimizers.lamb import Lamb

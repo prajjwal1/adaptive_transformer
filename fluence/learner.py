@@ -14,7 +14,7 @@ from thop import profile,clever_format
 home = str(Path.home())
 DataTuple = collections.namedtuple("DataTuple", 'dataset loader evaluator')
 load_lxmert_qa_path = home+'/snap/pretrained/model'
-torch.manual_seed(0)
+#torch.manual_seed(0)
 
 class Learner():
     def __init__(self, model, train_tuple, val_tuple, adaptive, load_model, measure_flops):
@@ -48,7 +48,7 @@ class Learner():
                 self.optim.zero_grad()
                 feats, boxes, target = feats.to(self.device), boxes.to(self.device), target.to(self.device)
                 
-                logit, att_dict = self.model(feats,boxes,sent)  
+                logit = self.model(feats,boxes,sent)  
                 assert logit.dim() == target.dim() == 2
                 loss = self.criterion(logit,target)*logit.size(1)
                 
@@ -181,7 +181,7 @@ class Learner():
             with torch.no_grad():
                 feats, boxes = feats.to(self.device), boxes.to(self.device)
                 logit = self.model(feats, boxes, sent)
-                score, label = logit.max(1)
+                score = logit.max(1)
                 for qid, l in zip(ques_id, label.cpu().numpy()):
                     ans = dset.label2ans[l]
                     quesid2ans[qid.item()] = ans

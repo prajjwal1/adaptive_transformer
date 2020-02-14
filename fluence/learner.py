@@ -17,21 +17,23 @@ load_lxmert_qa_path = home+'/snap/pretrained/model'
 #torch.manual_seed(0)
 
 class Learner():
-    def __init__(self, model, train_tuple, val_tuple, adaptive, load_model, measure_flops):
+    def __init__(self, model, data_tuple_dict, config):
         self.model = model
         self.criterion = nn.BCEWithLogitsLoss()
         base_optim = Lamb(params=self.model.parameters(),lr=1e-5, weight_decay=1.2e-6, min_trust=0.25)
         self.optim = Lookahead(base_optimizer=base_optim, k=5, alpha=0.8)
         self.lr_scheduler = CyclicLR(self.optim, base_lr=1e-5, max_lr = 5e-5, cycle_momentum=False)  
-        self.train_tuple = train_tuple
-        self.valid_tuple = val_tuple
+        self.train_tuple = data_tuple_dict['train_tuple']
+        self.valid_tuple = data_tuple_dict['valid_tuple']
+        self.test_tuple = data_tuple_dict['test_tuple']
         self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         self.output = home+'/snap/'
         os.makedirs(self.output, exist_ok=True)
         self.model.to(self.device)
-        self.adaptive = adaptive
-        self.measure_flops = measure_flops
-        if load_model==False:
+        self.adaptive = config['adaptive_enable']
+        self.measure_flops = config['measure_flops']
+        self.sparse = sparse = config['sparse_enable']
+        if config['load_model']==False:
             load_lxmert_qa(load_lxmert_qa_path, self.model, label2ans= self.train_tuple[0].label2ans)
           
         
@@ -78,24 +80,18 @@ class Learner():
 
                     for l in self.model.lxrt_encoder.model.bert.encoder.r_layers:
                         adapt_span_loss += l.attention.self.adaptive_span.get_loss()
-         #####################################################       
-                    loss += adapt_span_loss
-                
+                        
+                    loss += adapt_span_loss                 
+         #####################################################           
                 loss.backward()
-                
-
-                    
                 nn.utils.clip_grad_norm_(self.model.parameters(), 5.)
-                
-                   
                 self.optim.step()
                 self.lr_scheduler.step()
-                
                 score, label = logit.max(1)
                 for qid, l in zip(ques_id, label.cpu().numpy()):
                     ans = dset.label2ans[l]
                     quesid2ans[qid.item()] = ans
-                    
+          #####################################################          
                 if self.adaptive:
                     for l in self.model.lxrt_encoder.model.bert.encoder.layer:
                         l.attention.self.adaptive_span.clamp_param()
@@ -111,7 +107,7 @@ class Learner():
                      
                     for l in self.model.lxrt_encoder.model.bert.encoder.r_layers:
                         l.attention.self.adaptive_span.clamp_param()
-                        
+            #####################################################            
             log_str = "\nEpoch %d: Train %0.2f\n" % (epoch, evaluator.evaluate(quesid2ans) * 100.)
             
             log_str += 'Loss: ' + str(loss.item()) +"\t"
@@ -143,8 +139,22 @@ class Learner():
                 for layer_idx, i in enumerate(self.model.lxrt_encoder.model.bert.encoder.r_layers):
                     l = i.attention.self.adaptive_span.get_current_avg_span()
                     log_str += "Self Vision %d %d\t" %(layer_idx,l)
-            
-                
+            #####################################################       
+            if self.sparse:
+                alpha_val = {}
+                for l in self.model.lxrt_encoder.model.bert.encoder.layer:
+                    alpha_val["lang_layer"] = l.attention.self.entmax_alpha.alpha_chooser
+                for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
+                    alpha_val["cross_layer"] = l.visual_attention.att.entmax_alpha.alpha_chooser
+                for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
+                    alpha_val["cross_lang_layer"] = l.lang_self_att.self.entmax_alpha.alpha_chooser
+                for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
+                    alpha_val["cross_vision_layer"] = l.visn_self_att.self.entmax_alpha.alpha_chooser[i]
+                for l in self.model.lxrt_encoder.model.bert.encoder.r_layers:
+                    alpha_val["vision_layer"] = l.attention.self.entmax_alpha.alpha_chooser[i]
+                print("Alpha Values from Entmax have been saved at "+ home+'/snap/alpha_val_'+str(epoch)+'.pth')   
+                torch.save(alpha_val, home+'/snap/alpha_val_' + str(epoch)+ '.pth')
+            #####################################################        
             if self.valid_tuple is not None:  # Do Validation
                 valid_score = self.evaluate(self.valid_tuple)
                 if valid_score > best_valid:
@@ -181,7 +191,7 @@ class Learner():
             with torch.no_grad():
                 feats, boxes = feats.to(self.device), boxes.to(self.device)
                 logit = self.model(feats, boxes, sent)
-                score = logit.max(1)
+                score, label = logit.max(1)
                 for qid, l in zip(ques_id, label.cpu().numpy()):
                     ans = dset.label2ans[l]
                     quesid2ans[qid.item()] = ans
@@ -210,5 +220,5 @@ class Learner():
 
     def load(self, path):
         print("Load model from %s" % path)
-        state_dict = torch.load("%s.pth" % path)
+        state_dict = torch.load("%s.pth" % path, map_location=torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu'))
         self.model.load_state_dict(state_dict)

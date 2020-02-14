@@ -115,9 +115,7 @@ class BertAttention(nn.Module):
             attention_scores = attention_scores + attention_mask    
             
         if self.sparse:
-            torch.save(attention_scores, home+'/snap/attention_scores.pth')
             attention_probs = self.entmax_alpha(attention_scores)
-            torch.save(attention_probs, home+'/snap/attention_probs.pth')
         else:
             attention_probs = nn.Softmax(dim=-1)(attention_scores)    
 

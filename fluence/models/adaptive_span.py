@@ -36,8 +36,11 @@ class AdaptiveSpan(nn.Module):
             mask = self.mask_template_1 + self.current_val*mask_size
         mask = mask / self.ramp_size + 1                             
         mask = mask.clamp(0, 1)
-        x = x * mask   # [bs, nb_heads, 36, 64]) [bs, nb_heads, 1, 64]
-        return x
+        if x.size(0)==mask.size(0):
+            x = x * mask   # [bs, nb_heads, 36, 64]) [bs, nb_heads, 1, 64]
+            return x
+        else:
+            return x
     
     def get_current_avg_span(self,include_ramp=True):
         current_size = math.ceil(self.current_val.mean().item() * self.attn_span)

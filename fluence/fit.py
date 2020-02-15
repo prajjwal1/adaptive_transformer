@@ -108,8 +108,8 @@ if not args.test:
     test_tuple = None
 else:
     print("Only Testing will be performed")
-    train_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'train', args.tiny, args.bs, shuffle=False,drop_last=False)
-    valid_tuple = None #get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, '', args.tiny, args.bs, shuffle=False,drop_last=False)
+    train_tuple = None
+    valid_tuple = None 
     test_tuple = get_data_tuple(VQA_DATA_ROOT, MSCOCO_IMGFEAT_ROOT, 'test', args.tiny, args.bs, shuffle=False, drop_last=False)
 
 params = {'adapt_span_enabled': args.adaptive, 'attn_span': 1024, 'adapt_span_loss_coeff': 0.000005, 'adapt_span_ramp': 32, 'adapt_span_init': 0.002, 'adapt_span_cache': True, 'nb_heads': 12,'bs': args.bs, 'mask_size': [20,36], 'sparse_enabled': args.sparse, 'num_attention_heads': 4, 'layer_sizes': {'lang':9,'cross':5,'vision':5}, 'from_scratch': False, 'layerdrop_enabled': args.layerdrop, 'layerdrop_num_layers': 1}

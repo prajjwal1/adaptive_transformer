@@ -54,13 +54,13 @@ class Learner():
                 assert logit.dim() == target.dim() == 2
                 loss = self.criterion(logit,target)*logit.size(1)
                 
-                if not math.isfinite(loss):
-                    print("Loss is {}, stopping training".format(loss))
-                    print(loss)
-                    torch.save(att_dict, home+'/snap/interpret.pth')
-                    torch.save(logit, home+'/snap/logit.pth')
-                    torch.save(target, home+'/snap/target.pth')
-                    sys.exit(1)
+#                 if not math.isfinite(loss):
+#                     print("Loss is {}, stopping training".format(loss))
+#                     print(loss)
+#                     torch.save(att_dict, home+'/snap/interpret.pth')
+#                     torch.save(logit, home+'/snap/logit.pth')
+#                     torch.save(target, home+'/snap/target.pth')
+#                     sys.exit(1)
             
          #####################################################       
                 if self.adaptive:
@@ -149,9 +149,9 @@ class Learner():
                 for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
                     alpha_val["cross_lang_layer"] = l.lang_self_att.self.entmax_alpha.alpha_chooser
                 for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
-                    alpha_val["cross_vision_layer"] = l.visn_self_att.self.entmax_alpha.alpha_chooser[i]
+                    alpha_val["cross_vision_layer"] = l.visn_self_att.self.entmax_alpha.alpha_chooser
                 for l in self.model.lxrt_encoder.model.bert.encoder.r_layers:
-                    alpha_val["vision_layer"] = l.attention.self.entmax_alpha.alpha_chooser[i]
+                    alpha_val["vision_layer"] = l.attention.self.entmax_alpha.alpha_chooser
                 print("Alpha Values from Entmax have been saved at "+ home+'/snap/alpha_val_'+str(epoch)+'.pth')   
                 torch.save(alpha_val, home+'/snap/alpha_val_' + str(epoch)+ '.pth')
             #####################################################        
@@ -186,7 +186,9 @@ class Learner():
         self.model.eval()
         dset, loader, evaluator = eval_tuple
         quesid2ans = {}
-        for i, datum_tuple in enumerate(loader):
+        iter_wrapper = (lambda x: tqdm(x, total=len(loader)))
+        print("Predict in progress")
+        for i, datum_tuple in iter_wrapper(enumerate(loader)):
             ques_id, feats, boxes, sent = datum_tuple[:4]   # Avoid seeing ground truth
             with torch.no_grad():
                 feats, boxes = feats.to(self.device), boxes.to(self.device)

@@ -14,7 +14,6 @@ from thop import profile,clever_format
 home = str(Path.home())
 DataTuple = collections.namedtuple("DataTuple", 'dataset loader evaluator')
 load_lxmert_qa_path = home+'/snap/pretrained/model'
-#torch.manual_seed(0)
 
 class Learner():
     def __init__(self, model, data_tuple_dict, config):
@@ -33,7 +32,7 @@ class Learner():
         self.adaptive = config['adaptive_enable']
         self.measure_flops = config['measure_flops']
         self.sparse = sparse = config['sparse_enable']
-        if config['load_model']==False:
+        if config['load_model']==None:
             load_lxmert_qa(load_lxmert_qa_path, self.model, label2ans= self.train_tuple[0].label2ans)
           
         
@@ -53,16 +52,7 @@ class Learner():
                 logit = self.model(feats,boxes,sent)  
                 assert logit.dim() == target.dim() == 2
                 loss = self.criterion(logit,target)*logit.size(1)
-                
-#                 if not math.isfinite(loss):
-#                     print("Loss is {}, stopping training".format(loss))
-#                     print(loss)
-#                     torch.save(att_dict, home+'/snap/interpret.pth')
-#                     torch.save(logit, home+'/snap/logit.pth')
-#                     torch.save(target, home+'/snap/target.pth')
-#                     sys.exit(1)
-            
-         #####################################################       
+     
                 if self.adaptive:
                     
                     adapt_span_loss = 0.
@@ -109,8 +99,8 @@ class Learner():
                         l.attention.self.adaptive_span.clamp_param()
             #####################################################            
             log_str = "\nEpoch %d: Train %0.2f\n" % (epoch, evaluator.evaluate(quesid2ans) * 100.)
-            
             log_str += 'Loss: ' + str(loss.item()) +"\t"
+                
             if self.adaptive:
                 log_str += "\tAdapt Span Loss: " + str(adapt_span_loss.item()) + "\n"
                     
@@ -138,22 +128,21 @@ class Learner():
                 log_str+="\n"
                 for layer_idx, i in enumerate(self.model.lxrt_encoder.model.bert.encoder.r_layers):
                     l = i.attention.self.adaptive_span.get_current_avg_span()
-                    log_str += "Self Vision %d %d\t" %(layer_idx,l)
-            #####################################################       
-            if self.sparse:
-                alpha_val = {}
-                for l in self.model.lxrt_encoder.model.bert.encoder.layer:
-                    alpha_val["lang_layer"] = l.attention.self.entmax_alpha.alpha_chooser
-                for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
-                    alpha_val["cross_layer"] = l.visual_attention.att.entmax_alpha.alpha_chooser
-                for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
-                    alpha_val["cross_lang_layer"] = l.lang_self_att.self.entmax_alpha.alpha_chooser
-                for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
-                    alpha_val["cross_vision_layer"] = l.visn_self_att.self.entmax_alpha.alpha_chooser
-                for l in self.model.lxrt_encoder.model.bert.encoder.r_layers:
-                    alpha_val["vision_layer"] = l.attention.self.entmax_alpha.alpha_chooser
-                print("Alpha Values from Entmax have been saved at "+ home+'/snap/alpha_val_'+str(epoch)+'.pth')   
-                torch.save(alpha_val, home+'/snap/alpha_val_' + str(epoch)+ '.pth')
+                    log_str += "Self Vision %d %d\t" %(layer_idx,l)       
+#             if self.sparse:
+#                 alpha_val = {}
+#                 for l in self.model.lxrt_encoder.model.bert.encoder.layer:
+#                     alpha_val["lang_layer"] = l.attention.self.entmax_alpha.alpha_chooser
+#                 for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
+#                     alpha_val["cross_layer"] = l.visual_attention.att.entmax_alpha.alpha_chooser
+#                 for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
+#                     alpha_val["cross_lang_layer"] = l.lang_self_att.self.entmax_alpha.alpha_chooser
+#                 for l in self.model.lxrt_encoder.model.bert.encoder.x_layers:
+#                     alpha_val["cross_vision_layer"] = l.visn_self_att.self.entmax_alpha.alpha_chooser
+#                 for l in self.model.lxrt_encoder.model.bert.encoder.r_layers:
+#                     alpha_val["vision_layer"] = l.attention.self.entmax_alpha.alpha_chooser
+#                 print("Alpha Values from Entmax have been saved at "+ home+'/snap/alpha_val_'+str(epoch)+'.pth')   
+#                 torch.save(alpha_val, home+'/snap/alpha_val_' + str(epoch)+ '.pth')
             #####################################################        
             if self.valid_tuple is not None:  # Do Validation
                 valid_score = self.evaluate(self.valid_tuple)

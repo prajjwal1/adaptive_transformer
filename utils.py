@@ -1,16 +1,26 @@
 # coding=utf-8
 # Copyleft 2019 Project LXRT
 
-import sys
-import csv
 import base64
+import csv
+import sys
 import time
 
 import numpy as np
 
 csv.field_size_limit(sys.maxsize)
-FIELDNAMES = ["img_id", "img_h", "img_w", "objects_id", "objects_conf",
-              "attrs_id", "attrs_conf", "num_boxes", "boxes", "features"]
+FIELDNAMES = [
+    "img_id",
+    "img_h",
+    "img_w",
+    "objects_id",
+    "objects_conf",
+    "attrs_id",
+    "attrs_conf",
+    "num_boxes",
+    "boxes",
+    "features",
+]
 
 
 def load_obj_tsv(fname, topk=None):
@@ -29,17 +39,17 @@ def load_obj_tsv(fname, topk=None):
         reader = csv.DictReader(f, FIELDNAMES, delimiter="\t")
         for i, item in enumerate(reader):
 
-            for key in ['img_h', 'img_w', 'num_boxes']:
+            for key in ["img_h", "img_w", "num_boxes"]:
                 item[key] = int(item[key])
-            
-            boxes = item['num_boxes']
+
+            boxes = item["num_boxes"]
             decode_config = [
-                ('objects_id', (boxes, ), np.int64),
-                ('objects_conf', (boxes, ), np.float32),
-                ('attrs_id', (boxes, ), np.int64),
-                ('attrs_conf', (boxes, ), np.float32),
-                ('boxes', (boxes, 4), np.float32),
-                ('features', (boxes, -1), np.float32),
+                ("objects_id", (boxes,), np.int64),
+                ("objects_conf", (boxes,), np.float32),
+                ("attrs_id", (boxes,), np.int64),
+                ("attrs_conf", (boxes,), np.float32),
+                ("boxes", (boxes, 4), np.float32),
+                ("features", (boxes, -1), np.float32),
             ]
             for key, shape, dtype in decode_config:
                 item[key] = np.frombuffer(base64.b64decode(item[key]), dtype=dtype)
@@ -50,6 +60,7 @@ def load_obj_tsv(fname, topk=None):
             if topk is not None and len(data) == topk:
                 break
     elapsed_time = time.time() - start_time
-    print("Loaded %d images in file %s in %d seconds." % (len(data), fname, elapsed_time))
+    print(
+        "Loaded %d images in file %s in %d seconds." % (len(data), fname, elapsed_time)
+    )
     return data
-

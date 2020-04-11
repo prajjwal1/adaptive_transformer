@@ -1,12 +1,14 @@
 ## Implementation of Entmax has been adapted from https://github.com/deep-spin/entmax/
+from pathlib import Path
+
 import torch
 from torch import nn
 from torch.autograd import Function
-from pathlib import Path
+
 home = str(Path.home())
 
-class AlphaChooser(torch.nn.Module):
 
+class AlphaChooser(torch.nn.Module):
     def __init__(self, head_count):
         super(AlphaChooser, self).__init__()
         self.pre_alpha = nn.Parameter(torch.randn(head_count))
@@ -14,25 +16,28 @@ class AlphaChooser(torch.nn.Module):
     def forward(self):
         alpha = 1 + torch.sigmoid(self.pre_alpha)
         return torch.clamp(alpha, min=1.01, max=2)
-    
-class EntmaxAlpha(nn.Module):
 
+
+class EntmaxAlpha(nn.Module):
     def __init__(self, head_count, dim=0):
         super(EntmaxAlpha, self).__init__()
         self.dim = dim
         self.alpha_chooser = nn.Parameter(AlphaChooser(head_count)())
         self.alpha = self.alpha_chooser
-        
+
     def forward(self, att_scores):
         batch_size, head_count, query_len, key_len = att_scores.size()
-        
-        expanded_alpha = self.alpha.unsqueeze(0).unsqueeze(-1).unsqueeze(-1) # [1,nb_heads,1,1]
-        expanded_alpha = expanded_alpha.expand((batch_size, -1, query_len,1))# [bs, nb_heads, query_len,1]
+
+        expanded_alpha = (
+            self.alpha.unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+        )  # [1,nb_heads,1,1]
+        expanded_alpha = expanded_alpha.expand(
+            (batch_size, -1, query_len, 1)
+        )  # [bs, nb_heads, query_len,1]
         p_star = entmax_bisect(att_scores, expanded_alpha)
         return p_star
-    
-    
-    
+
+
 class EntmaxBisectFunction(Function):
     @classmethod
     def _gp(cls, x, alpha):
@@ -90,7 +95,7 @@ class EntmaxBisectFunction(Function):
 
     @classmethod
     def backward(cls, ctx, dY):
-        Y, = ctx.saved_tensors
+        (Y,) = ctx.saved_tensors
 
         gppr = torch.where(Y > 0, Y ** (2 - ctx.alpha), Y.new_zeros(1))
 
@@ -119,7 +124,8 @@ class EntmaxBisectFunction(Function):
             d_alpha = d_alpha.sum(ctx.dim).unsqueeze(ctx.dim)
 
         return dX, d_alpha, None, None, None
-    
+
+
 def entmax_bisect(X, alpha=1.5, dim=-1, n_iter=50, ensure_sum_one=True):
     """alpha-entmax: normalizing sparse transform (a la softmax).
     Solves the optimization problem:

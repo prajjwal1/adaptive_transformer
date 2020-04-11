@@ -2,10 +2,11 @@
 # Copyleft 2019 project LXRT.
 
 import json
-import torch
 import os
 
-cwd = os.getcwd()+'/pretrain/'
+import torch
+
+cwd = os.getcwd() + "/pretrain/"
 
 
 class AnswerTable:
@@ -14,28 +15,29 @@ class AnswerTable:
         "the man": "man",
         "a woman": "woman",
         "the woman": "woman",
-        'one': '1',
-        'two': '2',
-        'three': '3',
-        'four': '4',
-        'five': '5',
-        'six': '6',
-        'seven': '7',
-        'eight': '8',
-        'nine': '9',
-        'ten': '10',
-        'grey': 'gray',
+        "one": "1",
+        "two": "2",
+        "three": "3",
+        "four": "4",
+        "five": "5",
+        "six": "6",
+        "seven": "7",
+        "eight": "8",
+        "nine": "9",
+        "ten": "10",
+        "grey": "gray",
     }
 
     def __init__(self, dsets=None):
-        self.all_ans = json.load(open(cwd+"all_ans.json"))
+        self.all_ans = json.load(open(cwd + "all_ans.json"))
         if dsets is not None:
             dsets = set(dsets)
             # If the answer is used in the dsets
-            self.anss = [ans['ans'] for ans in self.all_ans if
-                         len(set(ans['dsets']) & dsets) > 0]
+            self.anss = [
+                ans["ans"] for ans in self.all_ans if len(set(ans["dsets"]) & dsets) > 0
+            ]
         else:
-            self.anss = [ans['ans'] for ans in self.all_ans]
+            self.anss = [ans["ans"] for ans in self.all_ans]
         self.ans_set = set(self.anss)
 
         self._id2ans_map = self.anss
@@ -49,7 +51,7 @@ class AnswerTable:
         if len(ans) == 0:
             return ""
         ans = ans.lower()
-        if ans[-1] == '.':
+        if ans[-1] == ".":
             ans = ans[:-1].strip()
         if ans.startswith("a "):
             ans = ans[2:].strip()
@@ -98,31 +100,34 @@ def load_lxmert_qa(path, model, label2ans):
     :return:
     """
     print("Load QA pre-trained LXMERT from %s " % path)
-    loaded_state_dict = torch.load("%s_LXRT.pth" % path, map_location=lambda storage, loc: storage)
+    loaded_state_dict = torch.load(
+        "%s_LXRT.pth" % path, map_location=lambda storage, loc: storage
+    )
     model_state_dict = model.state_dict()
 
     # Handle Multi-GPU pre-training --> Single GPU fine-tuning
     for key in list(loaded_state_dict.keys()):
-        loaded_state_dict[key.replace("module.", '')] = loaded_state_dict.pop(key)
+        loaded_state_dict[key.replace("module.", "")] = loaded_state_dict.pop(key)
 
     # Isolate bert model
     bert_state_dict = {}
     for key, value in loaded_state_dict.items():
-        if key.startswith('bert.'):
+        if key.startswith("bert."):
             bert_state_dict[key] = value
 
     # Isolate answer head
     answer_state_dict = {}
     for key, value in loaded_state_dict.items():
         if key.startswith("answer_head."):
-            answer_state_dict[key.replace('answer_head.', '')] = value
+            answer_state_dict[key.replace("answer_head.", "")] = value
 
     # Do surgery on answer state dict
-    ans_weight = answer_state_dict['logit_fc.3.weight']
-    ans_bias = answer_state_dict['logit_fc.3.bias']
+    ans_weight = answer_state_dict["logit_fc.3.weight"]
+    ans_bias = answer_state_dict["logit_fc.3.bias"]
     import copy
-    new_answer_weight = copy.deepcopy(model_state_dict['logit_fc.3.weight'])
-    new_answer_bias = copy.deepcopy(model_state_dict['logit_fc.3.bias'])
+
+    new_answer_weight = copy.deepcopy(model_state_dict["logit_fc.3.weight"])
+    new_answer_bias = copy.deepcopy(model_state_dict["logit_fc.3.bias"])
     answer_table = AnswerTable()
     loaded = 0
     unload = 0
@@ -136,13 +141,13 @@ def load_lxmert_qa(path, model, label2ans):
             new_answer_bias[label] = ans_bias[ans_id_9500]
             loaded += 1
         else:
-            new_answer_weight[label] = 0.
-            new_answer_bias[label] = 0.
+            new_answer_weight[label] = 0.0
+            new_answer_bias[label] = 0.0
             unload += 1
     print("Loaded %d answers from LXRTQA pre-training and %d not" % (loaded, unload))
     print()
-    answer_state_dict['logit_fc.3.weight'] = new_answer_weight
-    answer_state_dict['logit_fc.3.bias'] = new_answer_bias
+    answer_state_dict["logit_fc.3.weight"] = new_answer_weight
+    answer_state_dict["logit_fc.3.bias"] = new_answer_bias
 
     # Load Bert Weights
     bert_model_keys = set(model.lxrt_encoder.model.state_dict().keys())
@@ -157,6 +162,3 @@ def load_lxmert_qa(path, model, label2ans):
     assert len(ans_loaded_keys - model_keys) == 0
 
     model.load_state_dict(answer_state_dict, strict=False)
-
-
-

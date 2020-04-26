@@ -6,7 +6,6 @@ import time
 from pathlib import Path
 
 import torch
-from thop import clever_format, profile
 from torch import nn
 from torch.optim import AdamW
 from torch.optim.lr_scheduler import CyclicLR
@@ -44,6 +43,8 @@ class Learner:
         self.model.to(self.device)
         self.adaptive = config["adaptive_enable"]
         self.measure_flops = config["measure_flops"]
+        if self.measure_flops:
+            from thop import clever_format, profile
         self.sparse = sparse = config["sparse_enable"]
         if config["load_model"] == None:
             load_lxmert_qa(
@@ -246,11 +247,8 @@ class Learner:
         torch.save(self.model.state_dict(), os.path.join(self.output, "%s.pth" % name))
 
     def load(self, path):
-        print("Load model from %s" % path)
         state_dict = torch.load(
             "%s.pth" % path,
-            map_location=torch.device("cuda")
-            if torch.cuda.is_available()
-            else torch.device("cpu"),
+            map_location=self.device
         )
         self.model.load_state_dict(state_dict)

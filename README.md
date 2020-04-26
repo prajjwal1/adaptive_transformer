@@ -1,18 +1,35 @@
 # Adaptive Transformer
-The following is the code for the paper
+Official Pytorch code for the paper "Adaptive Transformers for Learning Multimodel Representations" (ACL SRW 2020). This codebase fully complies with Neurips 2020 research code guidelines.
 
-Usage:
-`python fit.py
-    [--bs]
-    [--epochs]
-    [--tiny]
-    [--adaptive]
-    [--sparse]
-    [--layerdrop]
-    [--load_model]
-    [--test]
-`
-## Data
+## Dependencies:
+Please refer `requirements.txt`.
+To install,
+```
+$ pip install -r requirements.txt 
+```
+
+## Dataset Preparation
+- Download the raw VQA 2.0 dataset from the [official website](https://visualqa.org/download.html).
+
+Make sure that your data directory looks similar to the following structure (you can change the paths if you want a different structure in `fit.py`).
+
+- These instructions are from [LXMERT repo]((https://github.com/airsplay/lxmert#vqa)). Download the re-distributed JSON files.
+```
+mkdir -p data/vqa
+wget --no-check-certificate https://nlp1.cs.unc.edu/data/lxmert_data/vqa/train.json -P data/vqa/
+wget --no-check-certificate https://nlp1.cs.unc.edu/data/lxmert_data/vqa/nominival.json -P  data/vqa/
+wget --no-check-certificate https://nlp1.cs.unc.edu/data/lxmert_data/vqa/minival.json -P data/vqa/
+```
+For downloading FasterRCNN features, use these instructions:
+```
+mkdir -p data/mscoco_imgfeat
+wget --no-check-certificate https://nlp1.cs.unc.edu/data/lxmert_data/mscoco_imgfeat/train2014_obj36.zip -P data/mscoco_imgfeat
+unzip data/mscoco_imgfeat/train2014_obj36.zip -d data/mscoco_imgfeat && rm data/mscoco_imgfeat/train2014_obj36.zip
+wget --no-check-certificate https://nlp1.cs.unc.edu/data/lxmert_data/mscoco_imgfeat/val2014_obj36.zip -P data/mscoco_imgfeat
+unzip data/mscoco_imgfeat/val2014_obj36.zip -d data && rm data/mscoco_imgfeat/val2014_obj36.zip
+```
+If the links don't work, you can use [Google drive link](https://drive.google.com/drive/folders/1Gq1uLUk6NdD0CcJOptXjxE6ssY5XAuat?usp=sharing) to get access. For more details, please refer [LXMERT repo](https://github.com/airsplay/lxmert).
+
 Setup the directory structure like this:
 In `/home/user/`
 ```
@@ -25,11 +42,67 @@ In `/home/user/`
 .......
 ```
 This structure can be changed but suitable modifications will be needed in `fit.py`
+
+## TODO: Downloading pretrained model
+Please download the pretrained models from this [Google drive link]()
+
+Alternatively, if you want to train (finetune) the model yourself, download the pretrained weights from [here](http://nlp1.cs.unc.edu/data/model_LXRT.pth). Skip this step if you're using my weights.
+
+## Training
+$ git clone https://github.com/prajjwal1/adaptive_transformer
+$ cd adaptive_transformer
+$ python3 fit.py --bs=128 --epochs=1 --sparse --tiny #test script
+
+If this worked well, then you're ready to train.
+
+Usage:
+```
+python fit.py
+    [--bs]            # Specify the batch size
+    [--epochs]        # Specify the epochs
+    [--tiny]          # Runs a test example (for debugging purposes)  
+    [--adaptive]      # Uses Adaptive Attention Span
+    [--sparse]        # Uses Entmax from Adaptively Sparse Transformers instead of softmax
+    [--layerdrop]     # Enables layerdrop
+    [--load_model]    # Resume training by specifying a checkpoint
+    [--test]          # Dumps a JSON file for submission to VQA servers.
+```
+More customizations can be done by modifying the `params` and `config` dict in `fit.py`. 
+
+It looks like this 
+```
+params = {
+    "adapt_span_enabled": args.adaptive,
+    "attn_span": 1024,
+    "adapt_span_loss_coeff": 0.000005,
+    "adapt_span_ramp": 32,
+    "adapt_span_init": 0.002,
+    "adapt_span_cache": True,
+    "nb_heads": 12,
+    "bs": args.bs,
+    "mask_size": [20, 36],
+    "sparse_enabled": args.sparse,
+    "num_attention_heads": 4,
+    "layer_sizes": {"lang": 9, "cross": 5, "vision": 5},
+    "from_scratch": False,
+    "layerdrop_enabled": args.layerdrop,
+    "layerdrop_num_layers": 1,
+}
+config = {
+    "adaptive_enable": args.adaptive,
+    "sparse_enable": args.sparse,
+    "measure_flops": False,
+    "load_model": args.load_model,
+}
+```
+Please check the `params` dict when starting training to see the configurations. Config should match with the config used in loaded model. 
+Remove the `tiny` flag to train on whole dataset.
+
 ##  Using Adaptive Attention Span
 ```
 python fit.py --bs=128 --epochs=1 --adaptive --tiny
 ```
-Remove the `tiny` flag to train on whole dataset. By default, attention spans of each layer is printed so that you can track it.
+ By default, attention spans of each layer is printed so that you can track it.
 
 ## Using Entmax 
 If `sparse` flag is enabled, softmax will be replaced with entmax to compute probability distribution of attention weights.
@@ -62,6 +135,45 @@ python fit.py --bs=128 --test --adaptive --load_model=adaptive_6910
 ```
 When `test` flag is passed, only inference is performed on the test set. Ground truths for test set for VQA are not publicly available. This command will dump the JSON file in the `/snap` directory. Submit the JSON file in the [EvalAI competition page](https://evalai.cloudcv.org/web/challenges/challenge-page/514/overview).
 
+## Explanation of this codebase
+- `dataset` : contains standard Pytorch dataset class for VQA
+- `models`: Contains implmentation of adaptive mechanisms and LXMERT
+- `nbs`: Probably the most interesting part. Use this to understand my workflow, attention methods I used. I used these notebooks to develop this codebase. You can also use these to understand how attention works in this context and much more.
+-  `optimizers`: implementation of LAMB and Lookahead optimizer
+- `pretrain`: utility tools
+- `fit.py`: Specifies how training and testing to be carried out. You'd probably want to modify this to adapt to your work.
+- `learner.py`: Implements a Learner class to control all functionalities of this codebase.
+- `run_train.sh`: You can modify this to setting hardware specific training (Optional)
+- `run_test.sh`: Set of tests (for me).
+
+## Results
+
+These results can be reproduced by using the scripts I provided above and using the same `params` and `config` dict values.
+Our model achives the following performance:
+```
+| Model                                 | test-dev | test-std |
+|---------------------------------------|----------|----------|
+| LXMERT                                |          |          |
+| w/ softmax                            | 72.42    | 72.54    |
+| w/ Adaptive Attention Span            | 71.62    | 71.72    |
+| w/ Adaptive Sparse                    | 71.73    | 71.97    |
+| w/ Layerdrop (10-6-6, p=1)            | 66.4     | 66.72    |
+| w/ Layerdrop (10-6-6, p=0)            | 66.35    | 66.57    |
+| w/ Layerdrop (9-5-5, p=1)             | 66.51    | 66.81    |
+| w/ Adaptive Attention Span and Entmax | 63.07    | 63.33    |
+```
+
+## TODO: Citation
+If you use this work in any form, please cite my paper:
+```
+```
+
+## Related papers
+- [Adaptive Attention Span in Transformers](https://arxiv.org/abs/1905.07799)
+- [Adaptively Sparse Transformers](https://arxiv.org/abs/1909.00015)
+- [Reducing Transformer Depth on Demand with Structured Dropout](https://arxiv.org/abs/1909.11556)
+
 ## Acknowledgement
-- Code for LXMERT was adapted from [LXMERT](https://github.com/airsplay/lxmert) repo.
-- Entmax autograd function was adapted from [entmax repo](https://github.com/deep-spin/entmax)
+- Code for LXMERT Model was adapted from [LXMERT](https://github.com/airsplay/lxmert) repo.
+- Entmax autograd function implementation was adapted from [entmax repo](https://github.com/deep-spin/entmax)
+

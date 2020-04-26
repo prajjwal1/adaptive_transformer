@@ -1,0 +1,5 @@
+numpy
+pytorch>=1.4
+tqdm
+thop
+matplotlib

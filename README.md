@@ -59,10 +59,11 @@ Please download the pretrained models from this [Google drive link](https://driv
 Alternatively, if you want to train (finetune) the model yourself, download the pretrained weights from [here](http://nlp1.cs.unc.edu/data/model_LXRT.pth). Skip this step if you're using my weights.
 
 ## Training
+```
 $ git clone https://github.com/prajjwal1/adaptive_transformer
 $ cd adaptive_transformer
 $ python3 train.py --bs=128 --epochs=1 --sparse --tiny #test script
-
+```
 If this worked well, then you're ready to train.
 
 Usage:
@@ -162,7 +163,7 @@ Please refer to [nbs/inference.ipynb](https://github.com/prajjwal1/adaptive_tran
 ## Results
 
 These results can be reproduced by using the scripts I provided above and using the same `params` and `config` dict values.
-Our model achives the following performance:
+Our model achives the following performance on the VQA 2.0 benchmark:
 ```
 | Model                                 | test-dev | test-std |
 |---------------------------------------|----------|----------|

@@ -1,7 +1,7 @@
 # Adaptive Transformer
-Official Pytorch code for the paper "Adaptive Transformers for Learning Multimodel Representations" (ACL SRW 2020). 
+> Pytorch code for the paper [Adaptive Transformers for Learning Multimodel Representations](https://arxiv.org/abs/2005.07486) (ACL SRW 2020)  Prajjwal Bhargava 
 
-ML Code Completness Checklist:
+ML Code Completeness Checklist:
 - [x] Specification of dependencies
 - [x] Training code
 - [x] Evaluation code

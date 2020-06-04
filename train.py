@@ -42,10 +42,10 @@ parser.add_argument(
     "--load_model",
     type=str,
     default=None,
-    help="Load the model (usually the fine-tuned model.",
+    help="Load the model (usually the fine-tuned model)",
 )
 parser.add_argument(
-    "--test", action="store_true", help="Use Adaptive Attention Span",
+    "--test", action="store_true", help="Run only evaluation",
 )
 
 args = parser.parse_args()

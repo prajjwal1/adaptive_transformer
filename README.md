@@ -1,5 +1,4 @@
 # Adaptive Transformers for Learning Multimodal Representations
-===============================================================
 
 <h4>
 ACL SRW 2020

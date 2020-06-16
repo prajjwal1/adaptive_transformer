@@ -1,5 +1,13 @@
-# Adaptive Transformer
-Pytorch code for the paper [Adaptive Transformers for Learning Multimodel Representations](https://arxiv.org/abs/2005.07486) (ACL SRW 2020). Prajjwal Bhargava 
+# Adaptive Transformers for Learning Multimodal Representations
+===============================================================
+<h4>
+Prajjwal Bhargava
+</br>
+</h4>
+<hr>
+Pytorch code for the paper [Adaptive Transformers for Learning Multimodel Representations](https://arxiv.org/abs/2005.07486) (ACL SRW 2020)
+
+
 
 ML Code Completeness Checklist:
 - [x] Specification of dependencies
@@ -178,15 +186,17 @@ Our model achives the following performance on the VQA 2.0 benchmark:
 ```
 
 ## TODO: Citation
-If you use this work in any form, please cite my paper:
+If you use this work in any form, please cite the paper:
 ```
+@misc{bhargava2020adaptive,
+    title={Adaptive Transformers for Learning Multimodal Representations},
+    author={Prajjwal Bhargava},
+    year={2020},
+    eprint={2005.07486},
+    archivePrefix={arXiv},
+    primaryClass={cs.CL}
+} 
 ```
-Coming soon.
-
-## Reading
-- [Adaptive Attention Span in Transformers](https://arxiv.org/abs/1905.07799)
-- [Adaptively Sparse Transformers](https://arxiv.org/abs/1909.00015)
-- [Reducing Transformer Depth on Demand with Structured Dropout](https://arxiv.org/abs/1909.11556)
 
 ## Acknowledgement
 - Code for LXMERT Model was adapted from [LXMERT](https://github.com/airsplay/lxmert) repo.

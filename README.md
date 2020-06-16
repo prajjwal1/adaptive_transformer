@@ -1,12 +1,15 @@
 # Adaptive Transformers for Learning Multimodal Representations
 ===============================================================
+
 <h4>
-Prajjwal Bhargava
+ACL SRW 2020
 </br>
+Prajjwal Bhargava
 </h4>
 <hr>
-Pytorch code for the paper [Adaptive Transformers for Learning Multimodel Representations](https://arxiv.org/abs/2005.07486) (ACL SRW 2020)
 
+
+**Paper:** [arXiv](https://arxiv.org/abs/2005.07486)
 
 
 ML Code Completeness Checklist:

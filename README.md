@@ -154,7 +154,7 @@ python train.py --bs=128 --epochs=1 --layerdrop --load_model=layerdrop_1066_ldro
 ```
 python train.py --bs=128 --test --adaptive --load_model=adaptive_6910
 ```
-When `test` flag is passed, only inference is performed on the test set. Ground truths for test set for VQA are not publicly available. This command will dump the JSON file in the `/snap` directory. Submit the JSON file in the [EvalAI competition page](https://evalai.cloudcv.org/web/challenges/challenge-page/514/overview).
+When `test` flag is passed, only inference is performed on the test set. Ground truths for test set for VQA are not publicly available. This command will dump the JSON file in the `/snap` directory. Submit the JSON file through the [EvalAI competition page](https://evalai.cloudcv.org/web/challenges/challenge-page/514/overview).
 
 ## Explanation of this codebase
 - `dataset` : contains standard Pytorch dataset class for VQA
@@ -187,7 +187,7 @@ Our model achives the following performance on the VQA 2.0 benchmark:
 | w/ Adaptive Attention Span and Entmax | 63.07    | 63.33    |
 ```
 
-## TODO: Citation
+## Citation
 If you use this work in any form, please cite the paper:
 ```
 @misc{bhargava2020adaptive,
@@ -199,6 +199,8 @@ If you use this work in any form, please cite the paper:
     primaryClass={cs.CL}
 } 
 ```
+or use this [ACL Anthology bibtex](https://www.aclweb.org/anthology/2020.acl-srw.1.bib)
+
 
 ## Acknowledgement
 - Code for LXMERT Model was adapted from [LXMERT](https://github.com/airsplay/lxmert) repo.

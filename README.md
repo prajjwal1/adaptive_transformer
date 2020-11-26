@@ -190,17 +190,20 @@ Our model achives the following performance on the VQA 2.0 benchmark:
 ## Citation
 If you use this work in any form, please cite the paper:
 ```
-@misc{bhargava2020adaptive,
-    title={Adaptive Transformers for Learning Multimodal Representations},
-    author={Prajjwal Bhargava},
-    year={2020},
-    eprint={2005.07486},
-    archivePrefix={arXiv},
-    primaryClass={cs.CL}
-} 
+@inproceedings{bhargava-2020-adaptive,
+    title = "Adaptive Transformers for Learning Multimodal Representations",
+    author = "Bhargava, Prajjwal",
+    booktitle = "Proceedings of the 58th Annual Meeting of the Association for Computational Linguistics: Student Research Workshop",
+    month = jul,
+    year = "2020",
+    address = "Online",
+    publisher = "Association for Computational Linguistics",
+    url = "https://www.aclweb.org/anthology/2020.acl-srw.1",
+    doi = "10.18653/v1/2020.acl-srw.1",
+    pages = "1--7",
+    abstract = "The usage of transformers has grown from learning about language semantics to forming meaningful visiolinguistic representations. These architectures are often over-parametrized, requiring large amounts of computation. In this work, we extend adaptive approaches to learn more about model interpretability and computational efficiency. Specifically, we study attention spans, sparse, and structured dropout methods to help understand how their attention mechanism extends for vision and language tasks. We further show that these approaches can help us learn more about how the network perceives the complexity of input sequences, sparsity preferences for different modalities, and other related phenomena.",
+}
 ```
-or use this [ACL Anthology bibtex](https://www.aclweb.org/anthology/2020.acl-srw.1.bib)
-
 
 ## Acknowledgement
 - Code for LXMERT Model was adapted from [LXMERT](https://github.com/airsplay/lxmert) repo.
